@@ -1,0 +1,20 @@
+# Core dependencies
+mediapipe==0.10.14
+opencv-python==4.10.0.84
+tensorflow==2.17.0
+keras==3.5.0
+numpy==1.26.4
+scipy==1.14.0
+scikit-learn==1.5.2
+matplotlib==3.9.2
+seaborn==0.13.2
+pandas==2.2.2
+tqdm==4.66.5
+PyYAML==6.0.2
+gTTS==2.5.3             # Amharic TTS (Google Text-to-Speech)
+playsound==1.3.0        # Audio playback
+requests==2.32.3        # Downloading pretrained weights
+h5py==3.11.0            # Keras .h5 model files
+joblib==1.4.2           # Dataset caching
+ipykernel==6.29.5       # Jupyter notebooks
+pytest==8.3.3           # Unit tests

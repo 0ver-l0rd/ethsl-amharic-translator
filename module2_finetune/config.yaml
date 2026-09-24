@@ -1,0 +1,71 @@
+# Module 2 — Fine-Tuning Configuration
+# ======================================
+# This configuration controls the fine-tuning pipeline.
+# Change values here without modifying any Python files.
+
+# ── Dataset ────────────────────────────────────────────────────────────────
+data:
+  processed_dir: "../data/processed"
+  splits_dir:    "../data/splits"
+  vocabulary:    "../data/vocabulary.json"
+  sequence_length: 30
+  feature_dim:     258
+  num_classes:     60
+
+# ── Starting point ──────────────────────────────────────────────────────────
+pretrained:
+  path: "../models/refined/best_model.h5"
+  # Can also point to any module1 output or scaffold weights
+  architecture: "bilstm"      # lstm | bilstm | gru | transformer
+
+# ── Fine-tuning strategy ────────────────────────────────────────────────────
+finetune:
+  # Number of encoder layers to freeze (0 = train all from start)
+  frozen_layers: 0
+  # Layer-wise learning rate decay (discriminative fine-tuning)
+  layer_lr_decay: 0.85        # each lower layer gets lr * decay^depth
+
+  # Main training
+  epochs: 50
+  batch_size: 16
+  learning_rate: 5.0e-4
+
+  # Comparatively evaluate ALL architectures if true
+  compare_architectures: true
+  architectures_to_compare:
+    - lstm
+    - bilstm
+    - gru
+    - transformer
+
+# ── Output ──────────────────────────────────────────────────────────────────
+output:
+  model_dir:  "../models/finetuned"
+  best_model: "best_model.h5"
+  logs_dir:   "../logs/finetune"
+  results_csv: "comparison_results.csv"
+
+# ── Training ────────────────────────────────────────────────────────────────
+training:
+  use_augmentation: true
+  augmentation:
+    mirror_prob:   0.5
+    noise_std:     0.005
+    jitter_frames: 3
+    scale_min:     0.85
+    scale_max:     1.15
+    dropout_prob:  0.1
+  early_stopping_patience: 15
+  reduce_lr_patience:       7
+  reduce_lr_factor:         0.5
+  min_lr:                   1.0e-7
+  seed: 42
+
+# ── Evaluation ──────────────────────────────────────────────────────────────
+evaluation:
+  # Run both signer-dependent and signer-independent evaluation
+  signer_dependent:   true
+  signer_independent: true
+  measure_latency:    true
+  latency_warmup:     10
+  latency_runs:       100

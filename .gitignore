@@ -1,0 +1,48 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.eggs/
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env
+
+# Raw data (large files, store externally or in DVC)
+data/raw/
+data/landmarks/
+data/processed/
+
+# Trained model weights (store in releases or DVC)
+models/refined/*.h5
+models/finetuned/*.h5
+models/pretrained/*.h5
+models/pretrained/*.pt
+
+# Logs and checkpoints
+logs/
+checkpoints/
+*.log
+wandb/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak

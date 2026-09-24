@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "total_signs": 60,
+    "language": "Ethiopian Sign Language (EthSL)",
+    "output_language": "Amharic",
+    "reference": "AAU Digital Dictionary of Ethiopian Sign Language (https://ethsl.aau.edu.et)",
+    "categories": ["greetings", "questions", "responses", "daily_life", "numbers", "emergency", "places", "time"]
+  },
+  "signs": {
+    "greetings": [
+      {"id": 0, "label": "selam",          "amharic": "\u1230\u120b\u121d",                  "description": "Hello / Peace"},
+      {"id": 1, "label": "dehna_neh",      "amharic": "\u12f0\u1205\u1293 \u1290\u1205",          "description": "Are you fine? (to male)"},
+      {"id": 2, "label": "dehna_nesh",     "amharic": "\u12f0\u1205\u1293 \u1290\u1231",          "description": "Are you fine? (to female)"},
+      {"id": 3, "label": "dehna_hun",      "amharic": "\u12f0\u1205\u1293 \u1201\u1295",          "description": "Goodbye / Be well"},
+      {"id": 4, "label": "tenayistilign",  "amharic": "\u1270\u1293\u12ed\u1235\u1275\u120d\u129d\u1295",  "description": "How are you? / Good morning"},
+      {"id": 5, "label": "ameseginalehu",  "amharic": "\u12a0\u1218\u1230\u130d\u1293\u1208\u1201",  "description": "Thank you"}
+    ],
+    "questions": [
+      {"id": 6,  "label": "simih_man_new",   "amharic": "\u1235\u121d\u1205 \u121b\u1295 \u1290\u12cd?",    "description": "What is your name?"},
+      {"id": 7,  "label": "min_felegh",      "amharic": "\u121d\u1295 \u134c\u1208\u130d?",          "description": "What do you want?"},
+      {"id": 8,  "label": "yet_new",         "amharic": "\u12e8\u1275 \u1290\u12cd?",            "description": "Where is it?"},
+      {"id": 9,  "label": "sint_new",        "amharic": "\u1235\u1295\u1275 \u1290\u12cd?",          "description": "How much is it?"},
+      {"id": 10, "label": "man_new",         "amharic": "\u121b\u1295 \u1290\u12cd?",            "description": "Who is it?"},
+      {"id": 11, "label": "lemin_new",       "amharic": "\u1208\u121d\u1295 \u1290\u12cd?",          "description": "Why?"},
+      {"id": 12, "label": "mechew_new",      "amharic": "\u1218\u127c \u1290\u12cd?",            "description": "When is it?"}
+    ],
+    "responses": [
+      {"id": 13, "label": "awo",            "amharic": "\u12a0\u12c8",                  "description": "Yes"},
+      {"id": 14, "label": "ay",             "amharic": "\u12a0\u12ed",                  "description": "No"},
+      {"id": 15, "label": "algebagn",       "amharic": "\u12a0\u120d\u1308\u1263\u129d\u1295",          "description": "I don't understand"},
+      {"id": 16, "label": "gebagn",         "amharic": "\u1308\u1263\u129d\u1295",                "description": "I understand"},
+      {"id": 17, "label": "aygebam",        "amharic": "\u12a0\u12ed\u1308\u1263\u121d",            "description": "I don't know"},
+      {"id": 18, "label": "ishi",           "amharic": "\u12a2\u123a",                  "description": "Okay / Alright"},
+      {"id": 19, "label": "melkam",         "amharic": "\u1218\u120d\u12ab\u121d",                "description": "Good"}
+    ],
+    "daily_life": [
+      {"id": 20, "label": "wiha",           "amharic": "\u12cd\u1203",                  "description": "Water"},
+      {"id": 21, "label": "migib",          "amharic": "\u121d\u130d\u1265",                  "description": "Food"},
+      {"id": 22, "label": "bet",            "amharic": "\u1264\u1275",                  "description": "House / Home"},
+      {"id": 23, "label": "gena",           "amharic": "\u1364\u1294",                  "description": "Family"},
+      {"id": 24, "label": "lij",            "amharic": "\u120d\u1301",                  "description": "Child"},
+      {"id": 25, "label": "lijoch",         "amharic": "\u120d\u1303\u127d",                  "description": "Children"},
+      {"id": 26, "label": "set",            "amharic": "\u1230\u1275",                  "description": "Woman"},
+      {"id": 27, "label": "wend",           "amharic": "\u12c8\u1295\u12f5",                  "description": "Man"},
+      {"id": 28, "label": "hospital",       "amharic": "\u1206\u1235\u1352\u1273\u120d",              "description": "Hospital"},
+      {"id": 29, "label": "timhirt_bet",    "amharic": "\u1275\u121d\u1205\u122d\u1275 \u1264\u1275",      "description": "School"},
+      {"id": 30, "label": "meda_hanit",     "amharic": "\u1218\u12f5\u1203\u1292\u1275",              "description": "Medicine / Pharmacy"},
+      {"id": 31, "label": "genzeb",         "amharic": "\u1308\u1295\u12d8\u1265",                "description": "Money"}
+    ],
+    "numbers": [
+      {"id": 32, "label": "and",            "amharic": "\u12a0\u1295\u12f5",                  "description": "One (1)"},
+      {"id": 33, "label": "hulet",          "amharic": "\u1201\u1208\u1275",                  "description": "Two (2)"},
+      {"id": 34, "label": "sost",           "amharic": "\u1230\u120e\u1275",                  "description": "Three (3)"},
+      {"id": 35, "label": "arat",           "amharic": "\u12d8\u1220\u1275",                  "description": "Four (4)"},
+      {"id": 36, "label": "amist",          "amharic": "\u12a0\u121d\u1235\u1275",                "description": "Five (5)"},
+      {"id": 37, "label": "sidist",         "amharic": "\u1235\u12f5\u1235\u1275",                "description": "Six (6)"},
+      {"id": 38, "label": "sebat",          "amharic": "\u1230\u1263\u1275",                  "description": "Seven (7)"},
+      {"id": 39, "label": "simint",         "amharic": "\u1235\u121d\u1295\u1275",                "description": "Eight (8)"},
+      {"id": 40, "label": "zetegn",         "amharic": "\u12d8\u1320\u129d\u1295",                "description": "Nine (9)"},
+      {"id": 41, "label": "asr",            "amharic": "\u12d8\u1230\u122d",                  "description": "Ten (10)"}
+    ],
+    "emergency": [
+      {"id": 42, "label": "irdeta",         "amharic": "\u12a5\u122d\u12f3\u1273",                "description": "Help!"},
+      {"id": 43, "label": "himem",          "amharic": "\u1215\u1218\u121d",                  "description": "Pain / Sick"},
+      {"id": 44, "label": "police",         "amharic": "\u1356\u120a\u1235",                  "description": "Police"},
+      {"id": 45, "label": "esat",           "amharic": "\u12a5\u1233\u1275",                  "description": "Fire"},
+      {"id": 46, "label": "tesfaw",         "amharic": "\u1270\u1235\u1243\u12c8",                "description": "Hurry / Emergency"}
+    ],
+    "places": [
+      {"id": 47, "label": "addis_abeba",    "amharic": "\u12a0\u12f2\u1235 \u12a0\u1260\u1263",        "description": "Addis Ababa"},
+      {"id": 48, "label": "bota",           "amharic": "\u1266\u1273",                  "description": "Place / Location"},
+      {"id": 49, "label": "mercato",        "amharic": "\u12c8\u12f0 \u1308\u1260\u12eb",          "description": "Market"},
+      {"id": 50, "label": "godana",         "amharic": "\u130e\u12f3\u1293",                  "description": "Road / Street"},
+      {"id": 51, "label": "mengist",        "amharic": "\u1218\u1295\u130d\u1235\u1275",              "description": "Government / Office"}
+    ],
+    "time": [
+      {"id": 52, "label": "lela_ken",       "amharic": "\u1208\u120b \u12a8\u1295",              "description": "Today"},
+      {"id": 53, "label": "tnat",           "amharic": "\u1275\u1293\u1275",                  "description": "Yesterday"},
+      {"id": 54, "label": "nege",           "amharic": "\u1290\u1308",                  "description": "Tomorrow"},
+      {"id": 55, "label": "gudguda",        "amharic": "\u130d\u12f5\u130d\u12f3",                "description": "Now / Immediately"},
+      {"id": 56, "label": "gizie",          "amharic": "\u130c\u12dc",                  "description": "Time"},
+      {"id": 57, "label": "amet",           "amharic": "\u12d0\u1218\u1275",                  "description": "Year"},
+      {"id": 58, "label": "wer",            "amharic": "\u12c8\u122d",                  "description": "Month"},
+      {"id": 59, "label": "ken",            "amharic": "\u12a8\u1295",                  "description": "Day"}
+    ]
+  }
+}

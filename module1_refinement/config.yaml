@@ -1,0 +1,53 @@
+# Module 1 — Model Refinement Configuration
+# ==========================================
+# Edit this file to tune the refinement training process.
+# No Python changes needed.
+
+# ── Dataset ────────────────────────────────────────────────────────────────
+data:
+  processed_dir: "../data/processed"
+  splits_dir:    "../data/splits"
+  vocabulary:    "../data/vocabulary.json"
+  sequence_length: 30          # frames per sign window
+  feature_dim:     258         # pose(132) + lh(63) + rh(63)
+  num_classes:     60          # must match vocabulary.json
+
+# ── Pretrained weights ──────────────────────────────────────────────────────
+pretrained:
+  path: "../models/pretrained/sign_mediapipe_lstm_base.h5"
+  # Set to null to start from scaffold (random init)
+  # path: "../models/pretrained/sign_mediapipe_lstm_scaffold.h5"
+  architecture: "lstm"        # lstm | bilstm | gru | transformer
+  freeze_layers: true          # Freeze encoder layers in phase 1
+
+# ── Transfer learning phases ────────────────────────────────────────────────
+refinement:
+  # Phase 1: Train only the new EthSL classification head
+  phase1:
+    epochs: 20
+    learning_rate: 1.0e-3
+    batch_size: 32
+    freeze_encoder: true       # Freeze all layers except the output Dense
+
+  # Phase 2: Unfreeze all layers, train end-to-end with low LR
+  phase2:
+    epochs: 30
+    learning_rate: 1.0e-4
+    batch_size: 16
+    freeze_encoder: false      # Full fine-tuning
+
+# ── Output ──────────────────────────────────────────────────────────────────
+output:
+  model_dir:  "../models/refined"
+  best_model: "best_model.h5"
+  logs_dir:   "../logs/refinement"
+
+# ── Training ────────────────────────────────────────────────────────────────
+training:
+  validation_split: 0.15
+  use_augmentation: true
+  early_stopping_patience: 10
+  reduce_lr_patience: 5
+  reduce_lr_factor: 0.5
+  min_lr: 1.0e-6
+  seed: 42

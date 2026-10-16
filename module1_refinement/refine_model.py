@@ -165,7 +165,7 @@ def get_callbacks(cfg: dict, phase: int, output_dir: Path) -> list:
     tc = cfg["training"]
     return [
         keras.callbacks.ModelCheckpoint(
-            filepath=str(output_dir / f"phase{phase}_best.h5"),
+            filepath=str(output_dir / f"phase{phase}_best.keras"),  # Keras 3 checkpoints must be .keras
             monitor="val_accuracy",
             save_best_only=True,
             verbose=1,

@@ -64,8 +64,8 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Find all raw clip files
-    clip_files = sorted(input_dir.rglob("seq_*.npy"))
+    # Find all raw clip files (<signer>_seq_XXX.npy; legacy seq_XXX.npy also matches)
+    clip_files = sorted(input_dir.rglob("*seq_*.npy"))
     kp_files   = [f for f in clip_files if not f.name.endswith("_kp.npy")]
 
     if not kp_files:

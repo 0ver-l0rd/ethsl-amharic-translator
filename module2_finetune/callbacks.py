@@ -39,7 +39,7 @@ def build_callbacks(cfg: dict, output_dir: Path) -> list:
     return [
         # Save best model by validation accuracy
         keras.callbacks.ModelCheckpoint(
-            filepath=str(output_dir / "best.h5"),
+            filepath=str(output_dir / "best.keras"),  # Keras 3 checkpoints must be .keras
             monitor="val_accuracy",
             save_best_only=True,
             mode="max",

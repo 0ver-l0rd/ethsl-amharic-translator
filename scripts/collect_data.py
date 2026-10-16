@@ -6,15 +6,21 @@ Record sign clips via webcam and save raw video frames to disk.
 For each sign in the vocabulary, the script:
   1. Displays a countdown prompt showing which sign to perform
   2. Records N_SEQUENCES clips of SEQUENCE_LENGTH frames each
-  3. Saves each clip as a numpy array of BGR frames
+  3. Saves each clip as a numpy array of BGR frames, named
+     <signer>_seq_XXX.npy so every clip records who performed it
+
+Every recording session MUST pass --signer. The ID is what makes
+signer-independent evaluation possible, and it keeps each person's clips
+from overwriting another's. Use anonymous codes (s01, s02, ...) and keep
+the code -> person mapping outside the repo.
 
 This script is designed for the EthSL data collection protocol
 described in the project proposal (§5.2).
 
 Usage:
-  python scripts/collect_data.py
-  python scripts/collect_data.py --signs selam,awo,ay  # specific signs only
-  python scripts/collect_data.py --sequences 20        # 20 clips per sign
+  python scripts/collect_data.py --signer s01
+  python scripts/collect_data.py --signer s02 --signs selam,awo,ay  # specific signs only
+  python scripts/collect_data.py --signer s01 --sequences 20        # 20 clips per sign
 
 Authors: Bersabeh Dawit, Menase Teshale
 """
@@ -22,10 +28,14 @@ Authors: Bersabeh Dawit, Menase Teshale
 import cv2
 import numpy as np
 import os
+import sys
 import json
 import argparse
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.clip_naming import validate_signer_id, clip_filename, next_clip_index
 
 # ── Configuration ──────────────────────────────────────────────────────────
 SEQUENCE_LENGTH = 30         # frames per clip
@@ -74,12 +84,14 @@ def record_sign(
     output_dir: Path,
     n_sequences: int,
     sequence_length: int,
+    signer: str,
 ) -> int:
     """Record n_sequences clips for a given sign. Returns clips recorded."""
     sign_dir = output_dir / sign_label
     sign_dir.mkdir(parents=True, exist_ok=True)
+    start_idx = next_clip_index(sign_dir, signer)
 
-    print(f"\n  Sign: {sign_label}")
+    print(f"\n  Sign: {sign_label}  (signer {signer}, existing clips: {start_idx})")
     print(f"  Amharic: {sign_info['amharic']}")
     print(f"  Description: {sign_info['description']}")
     print(f"  Perform this sign {n_sequences} times.\n")
@@ -109,7 +121,7 @@ def record_sign(
             # Status overlay
             progress = int((f_idx + 1) / sequence_length * frame.shape[1])
             cv2.rectangle(frame, (0, 0), (progress, 8), (0, 255, 0), -1)
-            draw_text(frame, f"RECORDING [{seq_idx+1}/{n_sequences}]", (10, 40),
+            draw_text(frame, f"RECORDING [{seq_idx+1}/{n_sequences}]  signer {signer}", (10, 40),
                       color=(0, 0, 255), scale=1.0, thickness=2)
             draw_text(frame, f"Frame {f_idx+1}/{sequence_length}", (10, 75), color=(255, 255, 255))
 
@@ -119,7 +131,7 @@ def record_sign(
             frames.append(frame.copy())
 
         # Save frames
-        save_path = sign_dir / f"seq_{seq_idx:03d}.npy"
+        save_path = sign_dir / clip_filename(signer, start_idx + seq_idx)
         np.save(str(save_path), np.array(frames))
         recorded += 1
         print(f"    Saved clip {seq_idx+1}/{n_sequences} -> {save_path}")
@@ -132,6 +144,8 @@ def record_sign(
 
 def main():
     parser = argparse.ArgumentParser(description="Record EthSL sign clips via webcam")
+    parser.add_argument("--signer",     required=True,
+                        help="Anonymous ID of the person signing, e.g. s01 (letters/digits/'-' only)")
     parser.add_argument("--signs",      default=None,
                         help="Comma-separated sign labels to record (default: all)")
     parser.add_argument("--sequences",  type=int, default=N_SEQUENCES,
@@ -141,6 +155,12 @@ def main():
     parser.add_argument("--camera",     type=int, default=0,
                         help="Camera device index (default: 0)")
     args = parser.parse_args()
+
+    try:
+        signer = validate_signer_id(args.signer)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        return
 
     vocab    = load_vocabulary(VOCAB_PATH)
     out_dir  = Path(args.output_dir)
@@ -156,6 +176,7 @@ def main():
 
     print(f"EthSL Data Collection")
     print(f"=====================")
+    print(f"Signer:          {signer}")
     print(f"Signs to record: {len(vocab)}")
     print(f"Clips per sign:  {args.sequences}")
     print(f"Output:          {out_dir}")
@@ -172,7 +193,7 @@ def main():
     try:
         total_recorded = 0
         for label, info in vocab.items():
-            n = record_sign(cap, label, info, out_dir, args.sequences, SEQUENCE_LENGTH)
+            n = record_sign(cap, label, info, out_dir, args.sequences, SEQUENCE_LENGTH, signer)
             total_recorded += n
 
         print(f"\nData collection complete.")

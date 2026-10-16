@@ -88,7 +88,9 @@ def evaluate_model(model, X, y, labels, split_name: str) -> dict:
         "precision": float(p),
         "recall":    float(r),
         "f1":        float(f1),
-        "report":    classification_report(y, y_pred, target_names=labels,
+        # labels= keeps target_names aligned even when a test set lacks some classes
+        "report":    classification_report(y, y_pred, labels=list(range(len(labels))),
+                                            target_names=labels,
                                             zero_division=0, output_dict=True),
     }
 
@@ -97,19 +99,13 @@ def evaluate_model(model, X, y, labels, split_name: str) -> dict:
 # Single architecture fine-tuning
 # ---------------------------------------------------------------------------
 
-def finetune_architecture(arch: str, cfg: dict, datasets: dict, output_dir: Path) -> dict:
-    """Fine-tune one architecture and return evaluation results."""
-    print(f"\n{'='*60}")
-    print(f"Fine-tuning: {arch.upper()}")
-    print(f"{'='*60}")
-
+def train_model(arch: str, cfg: dict, train: tuple, val: tuple, run_dir: Path):
+    """Build (or load pretrained) `arch`, train it on `train`, return (best model, history)."""
     num_classes  = cfg["data"]["num_classes"]
     seq_len      = cfg["data"]["sequence_length"]
     feat_dim     = cfg["data"]["feature_dim"]
     ft_cfg       = cfg["finetune"]
     tr_cfg       = cfg["training"]
-    vocab        = Vocabulary(cfg["data"]["vocabulary"])
-    labels       = vocab.get_all_labels()
 
     # Build or load model
     pretrained_path = Path(cfg["pretrained"]["path"])
@@ -144,19 +140,18 @@ def finetune_architecture(arch: str, cfg: dict, datasets: dict, output_dir: Path
         dropout_prob=aug_cfg.get("dropout_prob", 0.1),
     ) if tr_cfg.get("use_augmentation", True) else None
 
-    X_train, y_train = datasets["train"]
+    X_train, y_train = train
     if aug:
         X_aug = np.stack([aug(x) for x in X_train])
         X_train = np.concatenate([X_train, X_aug])
         y_train = np.concatenate([y_train, y_train])
         print(f"  Augmented train size: {X_train.shape[0]}")
 
-    X_val, y_val = datasets["val"]
+    X_val, y_val = val
 
     # Callbacks
-    arch_output_dir = output_dir / arch
-    arch_output_dir.mkdir(parents=True, exist_ok=True)
-    callbacks = build_callbacks(cfg, arch_output_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    callbacks = build_callbacks(cfg, run_dir)
 
     # Train
     history = model.fit(
@@ -169,9 +164,27 @@ def finetune_architecture(arch: str, cfg: dict, datasets: dict, output_dir: Path
     )
 
     # Load best checkpoint
-    best_ckpt = arch_output_dir / "best.h5"
+    best_ckpt = run_dir / "best.keras"
     if best_ckpt.exists():
         model = keras.models.load_model(str(best_ckpt))
+
+    return model, history
+
+
+def finetune_architecture(arch: str, cfg: dict, datasets: dict, output_dir: Path) -> dict:
+    """Fine-tune one architecture and return evaluation results."""
+    print(f"\n{'='*60}")
+    print(f"Fine-tuning: {arch.upper()}")
+    print(f"{'='*60}")
+
+    vocab        = Vocabulary(cfg["data"]["vocabulary"])
+    labels       = vocab.get_all_labels()
+    eval_cfg     = cfg.get("evaluation", {})
+
+    # Main model: trained on the signer-dependent split (all signers). This is
+    # the model the real-time app uses.
+    arch_output_dir = output_dir / arch
+    model, history = train_model(arch, cfg, datasets["train"], datasets["val"], arch_output_dir)
 
     # Save final model
     final_path = arch_output_dir / "final_model.h5"
@@ -180,16 +193,22 @@ def finetune_architecture(arch: str, cfg: dict, datasets: dict, output_dir: Path
     # Evaluate
     results = {"architecture": arch, "epochs_trained": len(history.history["accuracy"])}
 
-    eval_cfg = cfg.get("evaluation", {})
-
     if eval_cfg.get("signer_dependent", True) and "test_sd" in datasets:
         X_t, y_t = datasets["test_sd"]
         sd_res = evaluate_model(model, X_t, y_t, labels, "Signer-Dependent")
         results["signer_dependent"] = sd_res
 
+    # Signer-independent: the main model has seen the held-out signer during
+    # training, so a separate model is trained without them and tested on them.
     if eval_cfg.get("signer_independent", True) and "test_si" in datasets:
+        print(f"\n  Training {arch.upper()} without the held-out signer (signer-independent)...")
+        si_model, si_history = train_model(
+            arch, cfg, datasets["train_si"], datasets["val_si"],
+            arch_output_dir / "signer_independent",
+        )
         X_t, y_t = datasets["test_si"]
-        si_res = evaluate_model(model, X_t, y_t, labels, "Signer-Independent")
+        si_res = evaluate_model(si_model, X_t, y_t, labels, "Signer-Independent")
+        si_res["epochs_trained"] = len(si_history.history["accuracy"])
         results["signer_independent"] = si_res
 
     if eval_cfg.get("measure_latency", True):

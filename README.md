@@ -151,10 +151,16 @@ python download_pretrained.py
 ```
 
 ### 3. Collect your data
+Every person records with their own anonymous signer ID (`s01`, `s02`, ...).
+The ID is stored in each clip's filename and is what makes the
+signer-independent evaluation possible, so never record without it or reuse
+another person's ID.
+
 ```bash
-python scripts/collect_data.py --sign_list data/vocabulary.json --output_dir data/raw
-python scripts/extract_landmarks.py --input_dir data/raw --output_dir data/landmarks
-python scripts/preprocess.py --input_dir data/landmarks --output_dir data/processed
+python scripts/collect_data.py --signer s01        # each team member uses their own ID
+python scripts/extract_landmarks.py
+python scripts/preprocess.py                       # also writes data/processed/signer_ids.npy
+python scripts/split_dataset.py                    # --holdout_signer s04 to pick the test signer
 ```
 
 ### 4. Refine the pre-trained model

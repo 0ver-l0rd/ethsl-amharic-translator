@@ -57,8 +57,9 @@ models/finetuned/
   comparison_results.csv     <- Ranked comparison table
   all_results.json           <- Full metrics for all architectures
   lstm/
-    best.h5                  <- Best LSTM checkpoint
+    best.keras               <- Best LSTM checkpoint
     final_model.h5           <- Final LSTM model
+    signer_independent/      <- LSTM retrained without the held-out signer (SI score only)
     training_log.csv         <- Epoch-by-epoch metrics
     results.json             <- LSTM evaluation results
   bilstm/ ...

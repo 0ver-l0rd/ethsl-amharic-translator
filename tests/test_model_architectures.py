@@ -15,8 +15,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Skip if TensorFlow not installed
 try:
     from module1_refinement.model_architectures import (
-        build_lstm, build_bilstm, build_gru, build_transformer, build_model
+        build_lstm, build_bilstm, build_gru, build_transformer, build_model, fast_predictor
     )
+    from tensorflow import keras
     TENSORFLOW_AVAILABLE = True
 except ImportError:
     TENSORFLOW_AVAILABLE = False
@@ -85,3 +86,23 @@ class TestModelArchitectures:
     def test_invalid_architecture_raises(self):
         with pytest.raises(ValueError):
             build_model("invalid_arch")
+
+    @pytest.mark.parametrize("arch", ["lstm", "bilstm", "gru", "transformer"])
+    @pytest.mark.parametrize("ext", ["h5", "keras"])
+    def test_save_load_roundtrip(self, arch, ext, tmp_path):
+        # The real-time app loads whichever architecture wins, so every one
+        # must survive save -> load_model with identical outputs.
+        model = build_model(arch, num_classes=NUM_CLASSES)
+        X, _ = make_dummy_batch()
+        path = tmp_path / f"model.{ext}"
+        model.save(str(path))
+        loaded = keras.models.load_model(str(path))
+        np.testing.assert_allclose(loaded.predict(X, verbose=0), model.predict(X, verbose=0),
+                                   atol=1e-5)
+
+    def test_fast_predictor_matches_predict(self):
+        model = build_transformer(num_classes=NUM_CLASSES, sequence_length=SEQUENCE_LENGTH,
+                                  feature_dim=FEATURE_DIM)
+        X, _ = make_dummy_batch()
+        np.testing.assert_allclose(fast_predictor(model)(X), model.predict(X, verbose=0),
+                                   atol=1e-5)

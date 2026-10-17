@@ -44,6 +44,10 @@ class LandmarkExtractor:
         Minimum detection confidence threshold for MediaPipe.
     min_tracking_confidence : float
         Minimum tracking confidence threshold for MediaPipe.
+    model_complexity : int
+        MediaPipe pose model size: 0 (lite, fastest), 1 (default), 2 (heavy).
+        Landmarks differ slightly between sizes, so use the same value for
+        training data extraction and live inference.
     """
 
     def __init__(
@@ -51,6 +55,7 @@ class LandmarkExtractor:
         include_face: bool = False,
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
+        model_complexity: int = 1,
     ):
         self.include_face = include_face
         self.feature_dim = FEATURE_DIM_WITH_FACE if include_face else FEATURE_DIM_NO_FACE
@@ -60,6 +65,7 @@ class LandmarkExtractor:
         self.mp_drawing_styles = mp.solutions.drawing_styles
 
         self.holistic = self.mp_holistic.Holistic(
+            model_complexity=model_complexity,
             min_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
         )

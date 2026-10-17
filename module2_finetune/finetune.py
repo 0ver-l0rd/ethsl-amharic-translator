@@ -46,7 +46,7 @@ from sklearn.metrics import (
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from module1_refinement.model_architectures import build_model
+from module1_refinement.model_architectures import build_model, fast_predictor
 from src.augmentation import AugmentationPipeline
 from src.vocabulary import Vocabulary
 from module2_finetune.callbacks import build_callbacks
@@ -63,12 +63,14 @@ def load_config(path: str) -> dict:
 
 
 def measure_latency(model, X_sample, n_warmup=10, n_runs=100) -> float:
+    """Single-sample latency in ms, using the same inference path as the live app."""
     s = X_sample[:1]
+    infer = fast_predictor(model)
     for _ in range(n_warmup):
-        model.predict(s, verbose=0)
+        infer(s)
     t0 = time.perf_counter()
     for _ in range(n_runs):
-        model.predict(s, verbose=0)
+        infer(s)
     return (time.perf_counter() - t0) / n_runs * 1000
 
 

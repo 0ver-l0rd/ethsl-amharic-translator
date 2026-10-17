@@ -151,11 +151,39 @@ def build_gru(
 # 4. Lightweight Transformer (Encoder-only)
 # ---------------------------------------------------------------------------
 
+# Custom layers are registered and implement get_config() so that saved
+# Transformer models (.h5 / .keras) can be loaded again by keras.models.load_model,
+# as long as this module has been imported first.
+
+@keras.utils.register_keras_serializable(package="ethsl")
+class PositionalEmbedding(layers.Layer):
+    """Adds a learned embedding of each frame's position (0..T-1) to the input."""
+
+    def __init__(self, sequence_length: int, embed_dim: int, **kwargs):
+        super().__init__(**kwargs)
+        self.sequence_length = sequence_length
+        self.embed_dim = embed_dim
+        self.pos_emb = layers.Embedding(input_dim=sequence_length, output_dim=embed_dim)
+
+    def call(self, inputs):
+        positions = keras.ops.arange(0, keras.ops.shape(inputs)[1])
+        return inputs + self.pos_emb(positions)
+
+    def get_config(self):
+        return {**super().get_config(),
+                "sequence_length": self.sequence_length, "embed_dim": self.embed_dim}
+
+
+@keras.utils.register_keras_serializable(package="ethsl")
 class _TransformerEncoderBlock(layers.Layer):
     """Single Transformer encoder block: Multi-head attention + FFN."""
 
-    def __init__(self, embed_dim: int, num_heads: int, ff_dim: int, dropout: float = 0.1):
-        super().__init__()
+    def __init__(self, embed_dim: int, num_heads: int, ff_dim: int, dropout: float = 0.1, **kwargs):
+        super().__init__(**kwargs)
+        self.embed_dim = embed_dim
+        self.num_heads = num_heads
+        self.ff_dim    = ff_dim
+        self.dropout   = dropout
         self.att  = layers.MultiHeadAttention(num_heads=num_heads, key_dim=embed_dim // num_heads)
         self.ffn  = keras.Sequential([
             layers.Dense(ff_dim, activation="relu"),
@@ -173,6 +201,11 @@ class _TransformerEncoderBlock(layers.Layer):
         ffn_out  = self.ffn(out1)
         ffn_out  = self.do2(ffn_out, training=training)
         return self.ln2(out1 + ffn_out)
+
+    def get_config(self):
+        return {**super().get_config(),
+                "embed_dim": self.embed_dim, "num_heads": self.num_heads,
+                "ff_dim": self.ff_dim, "dropout": self.dropout}
 
 
 def build_transformer(
@@ -200,14 +233,12 @@ def build_transformer(
     x = layers.Dense(embed_dim, name="input_projection")(inp)
 
     # Learned positional embedding
-    positions = tf.range(start=0, limit=sequence_length, delta=1)
-    pos_emb = layers.Embedding(input_dim=sequence_length, output_dim=embed_dim,
-                                name="positional_embedding")(positions)
-    x = x + pos_emb
+    x = PositionalEmbedding(sequence_length, embed_dim, name="positional_embedding")(x)
 
     # Transformer encoder blocks
     for i in range(num_blocks):
-        x = _TransformerEncoderBlock(embed_dim, num_heads, ff_dim, dropout)(x)
+        x = _TransformerEncoderBlock(embed_dim, num_heads, ff_dim, dropout,
+                                     name=f"encoder_block_{i}")(x)
 
     # Pool over time axis
     x = layers.GlobalAveragePooling1D(name="global_avg_pool")(x)
@@ -253,3 +284,16 @@ def build_model(architecture: str, **kwargs) -> keras.Model:
             f"Choose from: {list(MODEL_REGISTRY.keys())}"
         )
     return MODEL_REGISTRY[architecture](**kwargs)
+
+
+def fast_predictor(model: keras.Model):
+    """
+    Return a function mapping a (batch, T, D) float32 array to softmax
+    probabilities as a numpy array, for single-sample real-time inference.
+
+    model.predict() rebuilds its batching pipeline on every call (~100 ms on
+    CPU for one sample); a compiled tf.function gives identical outputs in
+    a few ms, which is what the live app and latency benchmarks need.
+    """
+    infer = tf.function(lambda x: model(x, training=False), reduce_retracing=True)
+    return lambda x: infer(tf.convert_to_tensor(x, dtype=tf.float32)).numpy()

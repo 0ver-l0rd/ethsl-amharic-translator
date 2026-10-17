@@ -26,7 +26,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 try:
-    from src.landmark_extractor import LandmarkExtractor
+    from src.landmark_extractor import LandmarkExtractor, FACE_MODES
     from src.sequence_builder import SequenceBuilder
 except ImportError:
     print("ERROR: Make sure you run this from the project root directory.")
@@ -64,7 +64,8 @@ def main():
     parser = argparse.ArgumentParser(description="Process CESL dataset videos into landmarks")
     parser.add_argument("--input_dir",  default="data/raw_cesl", help="Directory containing CESL .mp4 videos")
     parser.add_argument("--output_dir", default="data/landmarks", help="Directory to save extracted .npy arrays")
-    parser.add_argument("--include_face", action="store_true", help="Include face landmarks")
+    parser.add_argument("--face", choices=FACE_MODES, default="none",
+                        help="Face landmarks to include: none, subset (lips/eyes/eyebrows) or full")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir)
@@ -88,7 +89,7 @@ def main():
     print(f"Output directory: {output_dir}")
     print()
 
-    with LandmarkExtractor(include_face=args.include_face) as extractor:
+    with LandmarkExtractor(face_mode=args.face) as extractor:
         processed_count = 0
         
         for video_path in tqdm(video_files, desc="Extracting landmarks"):

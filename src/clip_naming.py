@@ -4,8 +4,11 @@ src/clip_naming.py
 Single source of truth for how recorded clips are named, so that the
 signer who performed each clip survives every pipeline stage:
 
-  collect_data.py      ->  data/landmarks/<label>/<signer>_seq_007.npy
+  collect_data.py      ->  data/landmarks/<label>/<signer>_seq_007.mp4
   extract_landmarks.py ->  data/landmarks/<label>/<signer>_seq_007_kp.npy
+
+(Clips recorded before the switch to video are <signer>_seq_007.npy frame
+arrays; extract_landmarks.py still reads those.)
   preprocess.py        ->  data/processed/signer_ids.npy  (one ID per sample)
 
 Signer IDs are short codes like "s01" rather than names, so the dataset
@@ -35,8 +38,8 @@ def validate_signer_id(signer: str) -> str:
 
 
 def clip_filename(signer: str, idx: int) -> str:
-    """Raw clip filename for a signer's idx-th recording of a sign."""
-    return f"{signer}_seq_{idx:03d}.npy"
+    """Raw clip (video) filename for a signer's idx-th recording of a sign."""
+    return f"{signer}_seq_{idx:03d}.mp4"
 
 
 def parse_signer(path: Path) -> Optional[str]:
@@ -49,7 +52,7 @@ def next_clip_index(sign_dir: Path, signer: str) -> int:
     """First unused clip index for this signer, so re-runs never overwrite."""
     used = [
         int(m.group("idx"))
-        for p in sign_dir.glob(f"{signer}_seq_*.npy")
+        for p in sign_dir.glob(f"{signer}_seq_*")   # .mp4, legacy .npy and _kp.npy
         if (m := _CLIP_RE.match(p.stem)) and m.group("signer") == signer
     ]
     return max(used) + 1 if used else 0

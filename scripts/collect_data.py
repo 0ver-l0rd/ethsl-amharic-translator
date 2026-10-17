@@ -1,14 +1,16 @@
 """
 scripts/collect_data.py
 ========================
-Record sign clips via webcam and save raw video frames to disk.
+Record sign clips via webcam and save them to disk as compressed .mp4 video.
 
 For each sign in the vocabulary, the script:
   1. Displays a countdown prompt showing which sign to perform
   2. Records N_SEQUENCES clips, each exactly SIGN_WINDOW_SECONDS long
      (the same window the live app uses, whatever the camera's frame rate)
-  3. Saves each clip as a numpy array of BGR frames, named
-     <signer>_seq_XXX.npy so every clip records who performed it
+  3. Saves each clip as an .mp4 video (~1% of the size of raw frames), named
+     <signer>_seq_XXX.mp4 so every clip records who performed it. Keeping
+     the video means landmarks can be re-extracted later (e.g. with another
+     face mode) without re-recording.
 
 Every recording session MUST pass --signer. The ID is what makes
 signer-independent evaluation possible, and it keeps each person's clips
@@ -38,6 +40,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import validate_signer_id, clip_filename, next_clip_index
 from src.sequence_builder import SIGN_WINDOW_SECONDS, MIN_WINDOW_FRAMES
+from src.video_io import write_clip
 
 # ── Configuration ──────────────────────────────────────────────────────────
 N_SEQUENCES     = 30         # number of clips per sign (30 × 4 signers = 120/sign)
@@ -140,10 +143,11 @@ def record_sign(
 
         # Save frames
         save_path = sign_dir / clip_filename(signer, start_idx + recorded)
-        np.save(str(save_path), np.array(frames))
+        write_clip(save_path, frames, fps=len(frames) / window_seconds)
         recorded += 1
         print(f"    Saved clip {seq_idx+1}/{n_sequences} -> {save_path}  "
-              f"({len(frames)} frames, {len(frames) / window_seconds:.0f} FPS)")
+              f"({len(frames)} frames, {len(frames) / window_seconds:.0f} FPS, "
+              f"{save_path.stat().st_size / 1e6:.1f} MB)")
 
         # Brief pause between clips
         time.sleep(0.5)

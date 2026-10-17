@@ -89,6 +89,12 @@ def main():
         print("\nERROR: No data found. Run collect_data.py and extract_landmarks.py first.")
         return
 
+    shapes = sorted({s.shape for s in X_list})
+    if len(shapes) > 1:
+        print(f"\nERROR: landmark files have different shapes {shapes}. They were probably "
+              f"extracted with different --face modes; re-run extract_landmarks.py with one mode.")
+        return
+
     X = np.stack(X_list, axis=0)   # (N, T, D)
     y = np.array(y_list, dtype=np.int32)  # (N,)
 

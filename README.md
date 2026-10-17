@@ -156,12 +156,27 @@ The ID is stored in each clip's filename and is what makes the
 signer-independent evaluation possible, so never record without it or reuse
 another person's ID.
 
+Each clip is 1.5 s (`SIGN_WINDOW_SECONDS`) saved as a compressed `.mp4`
+(~1.7 MB), so landmarks can be re-extracted later with other settings
+without re-recording.
+
 ```bash
 python scripts/collect_data.py --signer s01        # each team member uses their own ID
-python scripts/extract_landmarks.py
+python scripts/extract_landmarks.py --face subset  # --face none | subset | full (see below)
 python scripts/preprocess.py                       # also writes data/processed/signer_ids.npy
 python scripts/split_dataset.py                    # --holdout_signer s04 to pick the test signer
 ```
+
+**Face landmarks** (`--face`), compared as an experiment in Module 2:
+
+| Mode | Face points | Features / frame |
+|---|---|---|
+| `none` | none (pose + hands) | 258 |
+| `subset` | 92: lips, eyes, eyebrows | 534 |
+| `full` | all 468 (face mesh) | 1662 |
+
+Training reads the feature size from the data, and the live app reads it from
+the model, so the mode only has to be chosen once, at extraction time.
 
 ### 4. Refine the pre-trained model
 ```bash

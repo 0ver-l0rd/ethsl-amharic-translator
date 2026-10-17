@@ -251,6 +251,14 @@ def main():
     dataset = EthSLDataset(cfg)
     datasets = dataset.load_all()
 
+    # The data decides the feature size (258 / 534 / 1662 depending on the
+    # face mode used in extract_landmarks.py), not the config file.
+    data_dim = int(datasets["train"][0].shape[-1])
+    if data_dim != cfg["data"]["feature_dim"]:
+        print(f"  NOTE: data has {data_dim} features per frame; "
+              f"using that instead of config feature_dim={cfg['data']['feature_dim']}")
+        cfg["data"]["feature_dim"] = data_dim
+
     # ── Determine architectures ──────────────────────────────────────────
     if args.arch:
         architectures = [args.arch]

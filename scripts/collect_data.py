@@ -5,7 +5,8 @@ Record sign clips via webcam and save raw video frames to disk.
 
 For each sign in the vocabulary, the script:
   1. Displays a countdown prompt showing which sign to perform
-  2. Records N_SEQUENCES clips of SEQUENCE_LENGTH frames each
+  2. Records N_SEQUENCES clips, each exactly SIGN_WINDOW_SECONDS long
+     (the same window the live app uses, whatever the camera's frame rate)
   3. Saves each clip as a numpy array of BGR frames, named
      <signer>_seq_XXX.npy so every clip records who performed it
 
@@ -36,11 +37,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import validate_signer_id, clip_filename, next_clip_index
+from src.sequence_builder import SIGN_WINDOW_SECONDS, MIN_WINDOW_FRAMES
 
 # ── Configuration ──────────────────────────────────────────────────────────
-SEQUENCE_LENGTH = 30         # frames per clip
 N_SEQUENCES     = 30         # number of clips per sign (30 × 4 signers = 120/sign)
-FRAME_DELAY_MS  = 33         # ~30 fps
 DATA_DIR        = Path(__file__).parent.parent / "data" / "landmarks"
 VOCAB_PATH      = Path(__file__).parent.parent / "data" / "vocabulary.json"
 
@@ -83,7 +83,7 @@ def record_sign(
     sign_info: dict,
     output_dir: Path,
     n_sequences: int,
-    sequence_length: int,
+    window_seconds: float,
     signer: str,
 ) -> int:
     """Record n_sequences clips for a given sign. Returns clips recorded."""
@@ -110,31 +110,40 @@ def record_sign(
             if cv2.waitKey(1000) & 0xFF == ord("q"):
                 return recorded
 
-        # --- Recording ---
+        # --- Recording: every camera frame for exactly window_seconds ---
+        for _ in range(5):          # drop frames buffered during the countdown
+            cap.grab()
         frames = []
-        for f_idx in range(sequence_length):
+        t_start = time.perf_counter()
+        while True:
             ret, frame = cap.read()
-            if not ret:
+            elapsed = time.perf_counter() - t_start
+            if not ret or elapsed > window_seconds:
                 break
             frame = cv2.flip(frame, 1)
+            frames.append(frame.copy())   # save the clean frame, before any overlay
 
-            # Status overlay
-            progress = int((f_idx + 1) / sequence_length * frame.shape[1])
+            # Status overlay (display only)
+            progress = int(min(elapsed / window_seconds, 1.0) * frame.shape[1])
             cv2.rectangle(frame, (0, 0), (progress, 8), (0, 255, 0), -1)
             draw_text(frame, f"RECORDING [{seq_idx+1}/{n_sequences}]  signer {signer}", (10, 40),
                       color=(0, 0, 255), scale=1.0, thickness=2)
-            draw_text(frame, f"Frame {f_idx+1}/{sequence_length}", (10, 75), color=(255, 255, 255))
+            draw_text(frame, f"{elapsed:.1f}s / {window_seconds:.1f}s", (10, 75), color=(255, 255, 255))
 
             cv2.imshow("EthSL Data Collection", frame)
-            cv2.waitKey(FRAME_DELAY_MS)
+            cv2.waitKey(1)
 
-            frames.append(frame.copy())
+        if len(frames) < MIN_WINDOW_FRAMES:
+            print(f"    WARNING: only {len(frames)} frames captured — clip discarded, "
+                  f"check the camera.")
+            continue
 
         # Save frames
-        save_path = sign_dir / clip_filename(signer, start_idx + seq_idx)
+        save_path = sign_dir / clip_filename(signer, start_idx + recorded)
         np.save(str(save_path), np.array(frames))
         recorded += 1
-        print(f"    Saved clip {seq_idx+1}/{n_sequences} -> {save_path}")
+        print(f"    Saved clip {seq_idx+1}/{n_sequences} -> {save_path}  "
+              f"({len(frames)} frames, {len(frames) / window_seconds:.0f} FPS)")
 
         # Brief pause between clips
         time.sleep(0.5)
@@ -179,6 +188,7 @@ def main():
     print(f"Signer:          {signer}")
     print(f"Signs to record: {len(vocab)}")
     print(f"Clips per sign:  {args.sequences}")
+    print(f"Clip length:     {SIGN_WINDOW_SECONDS:.1f} s (SIGN_WINDOW_SECONDS)")
     print(f"Output:          {out_dir}")
     print(f"\nPress 'q' to skip a sign, Ctrl+C to quit.\n")
 
@@ -193,7 +203,7 @@ def main():
     try:
         total_recorded = 0
         for label, info in vocab.items():
-            n = record_sign(cap, label, info, out_dir, args.sequences, SEQUENCE_LENGTH, signer)
+            n = record_sign(cap, label, info, out_dir, args.sequences, SIGN_WINDOW_SECONDS, signer)
             total_recorded += n
 
         print(f"\nData collection complete.")

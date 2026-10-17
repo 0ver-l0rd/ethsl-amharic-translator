@@ -61,8 +61,8 @@ python refine_model.py --config config.yaml --from_scratch
 ```
 models/refined/
   best_model.h5          <- best model by val_accuracy
-  phase1_best.h5         <- best from phase 1 only
-  phase2_best.h5         <- best from phase 2 only
+  phase1_best.keras      <- best from phase 1 only
+  phase2_best.keras      <- best from phase 2 only
   training_summary.json  <- accuracy, loss, epoch counts
   eval_report.json       <- full evaluation metrics
   confusion_matrix.png   <- visualized confusion matrix

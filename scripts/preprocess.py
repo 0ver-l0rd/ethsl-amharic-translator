@@ -5,6 +5,8 @@ Build the training dataset from extracted landmark .npy files.
 
 For each sign label, loads all *_kp.npy files, normalizes the sequences,
 and assembles X (features) and y (integer labels) arrays saved to data/processed/.
+Also saves signer_ids.npy (the signer of each sample, parsed from the filename),
+which split_dataset.py needs for the signer-independent split.
 
 Usage:
   python scripts/preprocess.py
@@ -23,6 +25,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.sequence_builder import SequenceBuilder
 from src.vocabulary import Vocabulary
+from src.clip_naming import parse_signer, UNKNOWN_SIGNER
 
 LANDMARKS_DIR = Path(__file__).parent.parent / "data" / "landmarks"
 PROCESSED_DIR = Path(__file__).parent.parent / "data" / "processed"
@@ -51,6 +54,7 @@ def main():
 
     X_list = []
     y_list = []
+    signer_list = []
     stats  = {}
 
     for label in tqdm(vocab.get_all_labels(), desc="Building dataset"):
@@ -76,6 +80,7 @@ def main():
 
             X_list.append(seq)
             y_list.append(class_id)
+            signer_list.append(parse_signer(kp_path) or UNKNOWN_SIGNER)
             count += 1
 
         stats[label] = count
@@ -90,9 +95,19 @@ def main():
     print(f"\nDataset shape: X={X.shape}, y={y.shape}")
     print(f"Samples per class (min/max): {min(stats.values())}/{max(stats.values())}")
 
+    signer_ids = np.array(signer_list)
+    signers, signer_counts = np.unique(signer_ids, return_counts=True)
+    samples_per_signer = {str(s): int(c) for s, c in zip(signers, signer_counts)}
+    print(f"Samples per signer: {samples_per_signer}")
+    if UNKNOWN_SIGNER in samples_per_signer:
+        print(f"  WARNING: {samples_per_signer[UNKNOWN_SIGNER]} samples have no signer ID in their "
+              f"filename (expected <signer>_seq_XXX_kp.npy). They will never be used as a "
+              f"held-out test signer.")
+
     # Save
     np.save(str(output_dir / "X.npy"), X)
     np.save(str(output_dir / "y.npy"), y)
+    np.save(str(output_dir / "signer_ids.npy"), signer_ids)
 
     with open(output_dir / "dataset_stats.json", "w") as f:
         json.dump({
@@ -101,9 +116,10 @@ def main():
             "sequence_length": X.shape[1],
             "feature_dim":     X.shape[2],
             "samples_per_class": stats,
+            "samples_per_signer": samples_per_signer,
         }, f, indent=2)
 
-    print(f"\nSaved X.npy, y.npy to {output_dir}")
+    print(f"\nSaved X.npy, y.npy, signer_ids.npy to {output_dir}")
     print(f"Run split_dataset.py next to create train/val/test splits.")
 
 

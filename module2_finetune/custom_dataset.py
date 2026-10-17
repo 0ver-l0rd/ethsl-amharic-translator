@@ -38,7 +38,9 @@ class EthSLDataset:
           'train'   : (X_train, y_train)
           'val'     : (X_val,   y_val)
           'test_sd' : (X_test,  y_test)  signer-dependent
-          'test_si' : (X_test,  y_test)  signer-independent (if available)
+          'train_si', 'val_si', 'test_si' : signer-independent (if available).
+              The held-out test signer is absent from train_si/val_si, so a
+              signer-independent score must come from a model trained on train_si.
         """
         X = np.load(self.proc_dir / "X.npy").astype(np.float32)
         y = np.load(self.proc_dir / "y.npy")
@@ -58,11 +60,18 @@ class EthSLDataset:
               f"Train: {len(train_idx)} | Val: {len(val_idx)} | Test: {len(test_idx)}")
 
         # Signer-independent split (optional)
-        si_path = self.splits_dir / "signer_independent_test_idx.npy"
-        if si_path.exists():
-            si_idx = np.load(si_path)
-            datasets["test_si"] = (X[si_idx], y[si_idx])
-            print(f"  Signer-Independent — Test: {len(si_idx)}")
+        si_paths = {
+            key: self.splits_dir / f"signer_independent_{part}_idx.npy"
+            for key, part in (("train_si", "train"), ("val_si", "val"), ("test_si", "test"))
+        }
+        if all(p.exists() for p in si_paths.values()):
+            sizes = []
+            for key, path in si_paths.items():
+                idx = np.load(path)
+                datasets[key] = (X[idx], y[idx])
+                sizes.append(len(idx))
+            print(f"  Signer-Independent — "
+                  f"Train: {sizes[0]} | Val: {sizes[1]} | Test: {sizes[2]}")
         else:
             print("  Signer-Independent split not found — skipping.")
 

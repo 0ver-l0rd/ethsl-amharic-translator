@@ -4,9 +4,19 @@ src/landmark_extractor.py
 MediaPipe Holistic wrapper for extracting pose, hand, and face landmarks
 from webcam frames or video files.
 
-Produces a flat numpy array of shape (N_LANDMARKS,) per frame,
-where N_LANDMARKS = 258 (pose=132, left_hand=63, right_hand=63)
-or 1662 when face landmarks are included.
+Produces a flat numpy array of shape (feature_dim,) per frame. The face
+mode decides how much of MediaPipe's 468-point face mesh is kept:
+
+  face_mode   face points kept                     feature_dim
+  ---------   ----------------------------------   -----------
+  "none"      none (pose + both hands only)            258
+  "subset"    92: lips, eyes, eyebrows                 534
+  "full"      all 468                                 1662
+
+The subset keeps the facial regions that carry meaning in sign language
+(eyebrows mark questions, the mouth and eyes carry expression) without
+letting jaw/cheek contours dominate the input. Holistic computes the face
+mesh on every frame regardless, so the mode does not change speed.
 
 Authors: Menase Teshale, Bersabeh Dawit
 """
@@ -14,7 +24,8 @@ Authors: Menase Teshale, Bersabeh Dawit
 import cv2
 import numpy as np
 import mediapipe as mp
-from typing import Optional, Tuple
+from mediapipe.python.solutions import face_mesh_connections as _fmc
+from typing import Tuple
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -23,13 +34,41 @@ POSE_LANDMARKS = 33        # MediaPipe Pose
 HAND_LANDMARKS = 21        # MediaPipe Hands (per hand)
 FACE_LANDMARKS = 468       # MediaPipe Face Mesh
 
+# Face-mesh regions kept in "subset" mode (MediaPipe's own region definitions)
+_FACE_SUBSET_CONNECTIONS = frozenset().union(
+    _fmc.FACEMESH_LIPS,
+    _fmc.FACEMESH_LEFT_EYE, _fmc.FACEMESH_RIGHT_EYE,
+    _fmc.FACEMESH_LEFT_EYEBROW, _fmc.FACEMESH_RIGHT_EYEBROW,
+)
+FACE_SUBSET_INDICES = np.array(sorted({i for edge in _FACE_SUBSET_CONNECTIONS for i in edge}))
+
 POSE_DIMS   = POSE_LANDMARKS * 4    # x, y, z, visibility = 132
 HAND_DIMS   = HAND_LANDMARKS * 3    # x, y, z             = 63
 FACE_DIMS   = FACE_LANDMARKS * 3    # x, y, z             = 1404
+FACE_SUBSET_DIMS = len(FACE_SUBSET_INDICES) * 3          # 92 x 3 = 276
+
+FACE_MODES = ("none", "subset", "full")
 
 # Default: pose + both hands only (no face) = 258 values/frame
-FEATURE_DIM_NO_FACE = POSE_DIMS + HAND_DIMS * 2          # 258
-FEATURE_DIM_WITH_FACE = POSE_DIMS + HAND_DIMS * 2 + FACE_DIMS  # 1662
+FEATURE_DIM_NO_FACE   = POSE_DIMS + HAND_DIMS * 2                     # 258
+FEATURE_DIM_FACE_SUBSET = FEATURE_DIM_NO_FACE + FACE_SUBSET_DIMS      # 534
+FEATURE_DIM_WITH_FACE = FEATURE_DIM_NO_FACE + FACE_DIMS               # 1662
+
+FEATURE_DIMS = {
+    "none":   FEATURE_DIM_NO_FACE,
+    "subset": FEATURE_DIM_FACE_SUBSET,
+    "full":   FEATURE_DIM_WITH_FACE,
+}
+
+
+def face_mode_for_dim(feature_dim: int) -> str:
+    """Face mode that produces `feature_dim` features (e.g. from a model's input shape)."""
+    for mode, dim in FEATURE_DIMS.items():
+        if dim == feature_dim:
+            return mode
+    raise ValueError(
+        f"Feature dim {feature_dim} matches no face mode; expected one of {FEATURE_DIMS}"
+    )
 
 
 class LandmarkExtractor:
@@ -38,8 +77,9 @@ class LandmarkExtractor:
 
     Parameters
     ----------
-    include_face : bool
-        If True, include 468 face landmarks (increases feature dim to 1662).
+    face_mode : str
+        "none" (default), "subset" or "full"; see the module docstring.
+        Training data and the live app must use the same mode.
     min_detection_confidence : float
         Minimum detection confidence threshold for MediaPipe.
     min_tracking_confidence : float
@@ -52,13 +92,15 @@ class LandmarkExtractor:
 
     def __init__(
         self,
-        include_face: bool = False,
+        face_mode: str = "none",
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
         model_complexity: int = 1,
     ):
-        self.include_face = include_face
-        self.feature_dim = FEATURE_DIM_WITH_FACE if include_face else FEATURE_DIM_NO_FACE
+        if face_mode not in FACE_MODES:
+            raise ValueError(f"face_mode must be one of {FACE_MODES}, got {face_mode!r}")
+        self.face_mode = face_mode
+        self.feature_dim = FEATURE_DIMS[face_mode]
 
         self.mp_holistic = mp.solutions.holistic
         self.mp_drawing  = mp.solutions.drawing_utils
@@ -125,14 +167,17 @@ class LandmarkExtractor:
             self.mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=2),
             self.mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=1),
         )
-        # Face (optional)
-        if self.include_face:
+        # Face: draw exactly the points the model receives
+        if self.face_mode != "none":
+            connections = (_FACE_SUBSET_CONNECTIONS if self.face_mode == "subset"
+                           else self.mp_holistic.FACEMESH_CONTOURS)
             self.mp_drawing.draw_landmarks(
                 frame,
                 results.face_landmarks,
-                self.mp_holistic.FACEMESH_CONTOURS,
+                connections,
                 landmark_drawing_spec=None,
-                connection_drawing_spec=self.mp_drawing_styles.get_default_face_mesh_contours_style(),
+                connection_drawing_spec=self.mp_drawing.DrawingSpec(
+                    color=(80, 220, 220), thickness=1, circle_radius=1),
             )
         return frame
 
@@ -176,13 +221,14 @@ class LandmarkExtractor:
             else np.zeros(HAND_DIMS)
         )
 
-        if self.include_face:
-            face = (
-                np.array([[lm.x, lm.y, lm.z]
-                           for lm in results.face_landmarks.landmark]).flatten()
-                if results.face_landmarks
-                else np.zeros(FACE_DIMS)
-            )
-            return np.concatenate([pose, lh, rh, face])
+        if self.face_mode == "none":
+            return np.concatenate([pose, lh, rh])
 
-        return np.concatenate([pose, lh, rh])
+        if results.face_landmarks:
+            face = np.array([[lm.x, lm.y, lm.z] for lm in results.face_landmarks.landmark])
+            if self.face_mode == "subset":
+                face = face[FACE_SUBSET_INDICES]
+            face = face.flatten()
+        else:
+            face = np.zeros(FACE_SUBSET_DIMS if self.face_mode == "subset" else FACE_DIMS)
+        return np.concatenate([pose, lh, rh, face])

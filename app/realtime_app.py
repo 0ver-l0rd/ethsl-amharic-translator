@@ -6,8 +6,9 @@ Real-time EthSL sign language recognition application.
 Pipeline (per frame):
   1. Capture frame from webcam
   2. Extract MediaPipe Holistic landmarks
-  3. Add frame to rolling 30-frame buffer
-  4. When buffer is full: run model inference
+  3. Add frame (with its capture time) to a rolling buffer
+  4. Once the buffer covers SIGN_WINDOW_SECONDS: resample that window to
+     30 frames (same time scale as the training clips) and run inference
   5. Display top-1 prediction (Amharic text) with confidence
   6. Synthesize Amharic speech for confirmed predictions
 
@@ -42,7 +43,7 @@ except ImportError:
     print("ERROR: TensorFlow not installed. Run: pip install tensorflow")
     sys.exit(1)
 
-from src.landmark_extractor import LandmarkExtractor
+from src.landmark_extractor import LandmarkExtractor, face_mode_for_dim
 from src.sequence_builder import SequenceBuilder
 from src.vocabulary import Vocabulary
 from src.amharic_tts import AmharicTTS
@@ -68,6 +69,7 @@ class LatestFrameReader:
         self._cap   = cap
         self._cond  = threading.Condition()
         self._frame = None
+        self._time  = 0.0        # perf_counter() when _frame was captured
         self._seq   = 0          # increments with every new frame
         self._ok    = True
         self._thread = threading.Thread(target=self._run, daemon=True)
@@ -76,20 +78,24 @@ class LatestFrameReader:
     def _run(self):
         while self._ok:
             ok, frame = self._cap.read()
+            t_captured = time.perf_counter()
             with self._cond:
                 if not ok:
                     self._ok = False
                 else:
-                    self._frame, self._seq = frame, self._seq + 1
+                    self._frame, self._time, self._seq = frame, t_captured, self._seq + 1
                 self._cond.notify_all()
 
     def read(self, last_seq: int, timeout: float = 2.0):
-        """Wait for a frame newer than last_seq. Returns (ok, frame, seq)."""
+        """
+        Wait for a frame newer than last_seq.
+        Returns (ok, frame, capture_time, seq).
+        """
         with self._cond:
             self._cond.wait_for(lambda: self._seq != last_seq or not self._ok, timeout)
             if self._seq == last_seq:
-                return False, None, last_seq
-            return True, self._frame, self._seq
+                return False, None, 0.0, last_seq
+            return True, self._frame, self._time, self._seq
 
     def stop(self):
         self._ok = False
@@ -103,7 +109,6 @@ def main():
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
                         help="Confidence threshold for accepting a prediction")
     parser.add_argument("--no_speech", action="store_true", help="Disable TTS output")
-    parser.add_argument("--include_face", action="store_true", help="Include face landmarks")
     parser.add_argument("--infer_every", type=int, default=2,
                         help="Run the classifier every N frames (1 = every frame). "
                              "Higher values raise FPS; a sign lasts ~30 frames.")
@@ -122,13 +127,22 @@ def main():
     print(f"Speech:    {'OFF' if args.no_speech else 'ON'}")
     print(f"Classify:  every {args.infer_every} frame(s)")
     print(f"MediaPipe: {'lite' if args.lite else 'full'}")
-    print()
 
     # Initialize components
     vocab    = Vocabulary(str(VOCAB_PATH))
     engine   = InferenceEngine(args.model, vocab, args.threshold)
-    seq_builder = SequenceBuilder(sequence_length=SEQUENCE_LENGTH,
-                                   feature_dim=1662 if args.include_face else 258)
+
+    # The model's input size says which face landmarks it was trained with
+    feature_dim = engine.model.input_shape[-1]
+    try:
+        face_mode = face_mode_for_dim(feature_dim)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+    print(f"Face mode: {face_mode} ({feature_dim} features, from the model)")
+    print()
+
+    seq_builder = SequenceBuilder(sequence_length=SEQUENCE_LENGTH, feature_dim=feature_dim)
     tts      = AmharicTTS() if not args.no_speech else None
     ui       = SignLanguageUI(vocab)
     speech_enabled = not args.no_speech
@@ -158,11 +172,11 @@ def main():
     STABLE_THRESHOLD    = 3   # consecutive same predictions before accepting
     frame_idx           = 0
 
-    with LandmarkExtractor(include_face=args.include_face,
+    with LandmarkExtractor(face_mode=face_mode,
                            model_complexity=0 if args.lite else 1) as extractor:
         while True:
             t0 = time.perf_counter()
-            ret, frame, frame_seq = reader.read(frame_seq)
+            ret, frame, t_captured, frame_seq = reader.read(frame_seq)
             if not ret:
                 print("ERROR: Failed to read frame")
                 break
@@ -171,7 +185,7 @@ def main():
 
             # Extract landmarks
             keypoints, results = extractor.process_frame(frame)
-            seq_builder.add_frame(keypoints)
+            seq_builder.add_frame(keypoints, timestamp=t_captured)
 
             # Draw landmarks
             frame = extractor.draw_landmarks(frame, results)
@@ -216,7 +230,7 @@ def main():
                 current_amharic=current_amharic,
                 confidence=current_confidence,
                 sentence_history=sentence_history[-5:],  # last 5 signs
-                buffer_fill=len(seq_builder._buffer) / SEQUENCE_LENGTH,
+                buffer_fill=seq_builder.fill_ratio(),
                 fps=fps,
                 speech_enabled=speech_enabled,
             )

@@ -205,6 +205,13 @@ def train(cfg: dict, from_scratch: bool):
     print("\n[1/5] Loading dataset...")
     (X_train, y_train), (X_val, y_val), (X_test, y_test) = load_dataset(cfg)
 
+    # The data decides the feature size (258 / 534 / 1662 depending on the
+    # face mode used in extract_landmarks.py), not the config file.
+    if X_train.shape[-1] != cfg["data"]["feature_dim"]:
+        print(f"  NOTE: data has {X_train.shape[-1]} features per frame; "
+              f"using that instead of config feature_dim={cfg['data']['feature_dim']}")
+        cfg["data"]["feature_dim"] = int(X_train.shape[-1])
+
     print("\n[2/5] Applying augmentation...")
     if cfg["training"]["use_augmentation"]:
         aug = AugmentationPipeline()

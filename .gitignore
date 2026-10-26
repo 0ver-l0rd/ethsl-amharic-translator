@@ -46,3 +46,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Recorded clips and trained checkpoints
+data/raw_cesl/
+models/**/*.keras
+models/**/*.h5

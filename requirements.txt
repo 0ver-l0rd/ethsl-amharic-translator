@@ -1,6 +1,7 @@
 # Core dependencies
 mediapipe==0.10.14
 opencv-python==4.10.0.84
+Pillow==10.4.0          # Draws Amharic (Ethiopic) text, which cv2.putText can't
 tensorflow==2.17.0
 keras==3.5.0
 numpy==1.26.4

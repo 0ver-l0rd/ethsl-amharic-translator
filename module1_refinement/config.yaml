@@ -14,9 +14,9 @@ data:
 
 # ── Pretrained weights ──────────────────────────────────────────────────────
 pretrained:
-  path: "../models/pretrained/sign_mediapipe_lstm_base.h5"
-  # Set to null to start from scaffold (random init)
-  # path: "../models/pretrained/sign_mediapipe_lstm_scaffold.h5"
+  # Made by pretrain_islr.py --arch <architecture> (Kaggle ISLR, see README).
+  # Missing file = random initialization.
+  path: "../models/pretrained/islr_lstm.h5"
   architecture: "lstm"        # lstm | bilstm | gru | transformer
   freeze_layers: true          # Freeze encoder layers in phase 1
 

@@ -49,6 +49,40 @@ python refine_model.py --config config.yaml
 python evaluate.py --model ../models/refined/best_model.h5 --config config.yaml
 ```
 
+## Pretraining on Kaggle ISLR (recommended)
+
+The public pretrained models above are no longer downloadable, so the
+starting point is pretrained here on Google's
+[Isolated Sign Language Recognition](https://www.kaggle.com/competitions/asl-signs)
+dataset: 250 ASL signs, ~94k clips, already in MediaPipe Holistic format.
+ASL only teaches the lower layers (hand shapes, motion); `refine_model.py`
+replaces the 250-sign output layer with the EthSL vocabulary.
+
+One-time setup: create a Kaggle account, accept the competition rules on the
+competition's **Data** tab, and save an API token (Kaggle → Settings → API →
+Create New Token) as `~/.kaggle/kaggle.json`.
+
+```bash
+# From the repo root. --download fetches only the selected clips and deletes
+# each raw file after converting it, so it needs almost no disk space.
+python scripts/convert_islr.py --download --max_per_sign 100
+
+# Pretrain (architecture must match pretrained.architecture in config.yaml)
+python module1_refinement/pretrain_islr.py --arch lstm
+
+# Then refine on EthSL as usual
+cd module1_refinement
+python refine_model.py --config config.yaml
+```
+
+- **Face mode:** convert with the same `--face` as the EthSL data
+  (`extract_landmarks.py --face`), or the weights won't fit.
+- **Mirroring:** our camera image is flipped before MediaPipe, which swaps
+  the hand channels. Once some EthSL clips exist, add
+  `--compare_with data/landmarks` to see whether ISLR needs `--mirror`.
+- **For the report:** compare EthSL accuracy with this pretraining against
+  `--from_scratch`.
+
 ## If pretrained weights can't be downloaded
 
 ```bash

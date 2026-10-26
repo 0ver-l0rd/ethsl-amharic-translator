@@ -15,6 +15,8 @@ PyYAML==6.0.2
 gTTS==2.5.3             # Amharic TTS (Google Text-to-Speech)
 playsound==1.2.2        # Audio playback (1.3.0 fails to build on modern setuptools)
 requests==2.32.3        # Downloading pretrained weights
+kaggle==1.6.17          # Kaggle ISLR download for pretraining (scripts/convert_islr.py)
+pyarrow==17.0.0         # Reading ISLR .parquet landmark files
 h5py==3.11.0            # Keras .h5 model files
 joblib==1.4.2           # Dataset caching
 ipykernel==6.29.5       # Jupyter notebooks

@@ -136,7 +136,7 @@ def train_model(arch: str, cfg: dict, train: tuple, val: tuple, run_dir: Path):
     aug_cfg = tr_cfg.get("augmentation", {})
     aug = AugmentationPipeline(
         mirror_prob=aug_cfg.get("mirror_prob", 0.5),
-        noise_std=aug_cfg.get("noise_std", 0.005),
+        noise_std=aug_cfg.get("noise_std", 0.02),
         jitter_frames=aug_cfg.get("jitter_frames", 3),
         scale_range=(aug_cfg.get("scale_min", 0.85), aug_cfg.get("scale_max", 1.15)),
         dropout_prob=aug_cfg.get("dropout_prob", 0.1),

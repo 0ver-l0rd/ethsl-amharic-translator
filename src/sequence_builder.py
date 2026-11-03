@@ -21,6 +21,8 @@ import numpy as np
 from collections import deque
 from typing import List, Optional
 
+from src.landmark_layout import body_relative
+
 
 SEQUENCE_LENGTH     = 30   # frames per sign sequence fed to the model
 SIGN_WINDOW_SECONDS = 1.5  # real time covered by one sign sequence
@@ -29,13 +31,21 @@ FEATURE_DIM = 258          # default: pose(132) + lh(63) + rh(63)
 
 
 def _resample(times: np.ndarray, frames: np.ndarray, targets: np.ndarray) -> np.ndarray:
-    """Linearly interpolate frames (T, D) sampled at `times` onto `targets`."""
+    """
+    Linearly interpolate frames (T, D) sampled at `times` onto `targets`.
+    A value that is missing (zero) in either neighbouring frame is not
+    blended, since that would place a hand halfway to the image corner;
+    the nearer frame's value is used instead.
+    """
     if len(times) == 1:
         return np.repeat(frames, len(targets), axis=0)
     idx = np.clip(np.searchsorted(times, targets, side="right") - 1, 0, len(times) - 2)
     t0, t1 = times[idx], times[idx + 1]
     w = np.clip((targets - t0) / np.maximum(t1 - t0, 1e-9), 0.0, 1.0)[:, None]
-    return (frames[idx] * (1.0 - w) + frames[idx + 1] * w).astype(np.float32)
+    a, b = frames[idx], frames[idx + 1]
+    blended = a * (1.0 - w) + b * w
+    nearest = np.where(w < 0.5, a, b)
+    return np.where((a != 0) & (b != 0), blended, nearest).astype(np.float32)
 
 
 class SequenceBuilder:
@@ -139,19 +149,16 @@ class SequenceBuilder:
             return frames_array
 
         # Resample along time axis
-        src_idx = np.linspace(0, T - 1, target_length)
-        tgt_idx = np.arange(T)
-        resampled = np.stack(
-            [np.interp(src_idx, tgt_idx, frames_array[:, d])
-             for d in range(frames_array.shape[1])],
-            axis=1,
-        )
-        return resampled.astype(np.float32)
+        return _resample(np.arange(T, dtype=np.float64), frames_array,
+                         np.linspace(0, T - 1, target_length))
 
     @staticmethod
     def normalize_sequence(sequence: np.ndarray) -> np.ndarray:
         """
-        Z-score normalize a sequence per feature dimension.
+        Normalize a raw landmark sequence for the model: coordinates relative
+        to the signer's mid-shoulder point, in shoulder widths (see
+        landmark_layout.body_relative). Training and the live app must both
+        use this.
 
         Parameters
         ----------
@@ -161,6 +168,4 @@ class SequenceBuilder:
         -------
         normalized : np.ndarray of shape (T, D)
         """
-        mean = sequence.mean(axis=0, keepdims=True)
-        std  = sequence.std(axis=0, keepdims=True) + 1e-8
-        return (sequence - mean) / std
+        return body_relative(sequence)

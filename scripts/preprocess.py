@@ -38,7 +38,7 @@ def main():
     parser.add_argument("--output_dir", default=str(PROCESSED_DIR))
     parser.add_argument("--vocab",      default=str(VOCAB_PATH))
     parser.add_argument("--no_normalize", action="store_true",
-                        help="Skip z-score normalization")
+                        help="Skip normalization (keep raw MediaPipe coordinates)")
     args = parser.parse_args()
 
     input_dir  = Path(args.input_dir)

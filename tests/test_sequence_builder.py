@@ -44,6 +44,17 @@ class TestBuildFromClip:
         np.testing.assert_allclose(out[0], frames[0])
         np.testing.assert_allclose(out[-1], frames[-1])
 
+    def test_interpolates_between_detected_frames(self):
+        frames = [motion(i + 1) for i in range(11)]
+        out = SequenceBuilder.build_from_clip(frames, target_length=21)
+        np.testing.assert_allclose(out[:, 0], np.linspace(1, 11, 21), atol=1e-5)
+
+    def test_does_not_blend_with_missing_landmarks(self):
+        # A hand that appears halfway through: never half-way to zero
+        frames = [motion(0.0)] * 5 + [motion(0.7)] * 5
+        out = SequenceBuilder.build_from_clip(frames, target_length=SEQUENCE_LENGTH)
+        np.testing.assert_allclose(np.unique(out[:, 0]), [0.0, 0.7], atol=1e-6)
+
 
 class TestTimeWindow:
 

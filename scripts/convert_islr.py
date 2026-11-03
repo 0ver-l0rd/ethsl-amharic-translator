@@ -61,19 +61,12 @@ from src.landmark_extractor import (
     POSE_LANDMARKS, HAND_LANDMARKS, FACE_LANDMARKS, FACE_SUBSET_INDICES,
     POSE_DIMS, HAND_DIMS, FACE_MODES,
 )
+from src.landmark_layout import POSE_MIRROR_PERM, FACE_MIRROR_PERM
 from src.sequence_builder import SequenceBuilder, SEQUENCE_LENGTH
 
 COMPETITION = "asl-signs"
 ISLR_DIR    = ROOT / "data" / "islr_raw"
 OUTPUT_DIR  = ROOT / "data" / "islr"
-
-# MediaPipe Pose landmarks that trade places when the image is mirrored:
-# eyes (1-3 <-> 4-6), ears, mouth corners, then every left/right body pair.
-POSE_MIRROR_PAIRS = [(1, 4), (2, 5), (3, 6), (7, 8), (9, 10)] + \
-                    [(i, i + 1) for i in range(11, POSE_LANDMARKS, 2)]
-POSE_MIRROR_PERM = np.arange(POSE_LANDMARKS)
-for a, b in POSE_MIRROR_PAIRS:
-    POSE_MIRROR_PERM[a], POSE_MIRROR_PERM[b] = b, a
 
 LH_COLS = slice(POSE_DIMS, POSE_DIMS + HAND_DIMS)
 RH_COLS = slice(POSE_DIMS + HAND_DIMS, POSE_DIMS + 2 * HAND_DIMS)
@@ -106,10 +99,13 @@ def islr_to_sequence(df: pd.DataFrame, face_mode: str = "none",
     face = _landmark_block(df, frame_ids, "face", FACE_LANDMARKS) if face_mode != "none" else None
 
     if mirror:
-        for block in (pose, lh, rh):
-            block[..., 0] = 1.0 - block[..., 0]
+        for block in (pose, lh, rh, face):
+            if block is not None:
+                block[..., 0] = 1.0 - block[..., 0]
         pose = pose[:, POSE_MIRROR_PERM]
         lh, rh = rh, lh
+        if face is not None:
+            face = face[:, FACE_MIRROR_PERM]
 
     x, y = pose[..., 0], pose[..., 1]
     visible = ~np.isnan(x) & (x >= 0) & (x <= 1) & (y >= 0) & (y <= 1)
@@ -207,7 +203,7 @@ def main():
     parser.add_argument("--face", choices=FACE_MODES, default="none",
                         help="Face points to include; must match the EthSL data's mode")
     parser.add_argument("--mirror", action="store_true",
-                        help="Mirror clips like our flipped camera image (pose and hands only)")
+                        help="Mirror clips like our flipped camera image")
     parser.add_argument("--max_per_sign", type=int, default=None,
                         help="Clips per sign (default: all, ~380). 100 gives 25k clips.")
     parser.add_argument("--download", action="store_true",
@@ -219,10 +215,6 @@ def main():
     parser.add_argument("--compare_with", default=None,
                         help="Our landmark folder (e.g. data/landmarks) to compare hand channels with")
     args = parser.parse_args()
-
-    if args.mirror and args.face != "none":
-        parser.error("--mirror supports --face none only (mirroring face points needs a "
-                     "face-mesh symmetry map)")
 
     islr_dir   = Path(args.islr_dir)
     output_dir = Path(args.output_dir)

@@ -23,6 +23,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from convert_islr import islr_to_sequence, POSE_MIRROR_PERM, LH_COLS, RH_COLS
 from src.landmark_extractor import LandmarkExtractor, FEATURE_DIMS, POSE_DIMS
+from src.landmark_layout import mirror
+from src.sequence_builder import SequenceBuilder
 
 # ISLR stores each frame as 543 rows in this order
 ISLR_TYPES = [("face", 468), ("left_hand", 21), ("pose", 33), ("right_hand", 21)]
@@ -123,6 +125,17 @@ def test_mirror_flips_x_and_swaps_sides():
     np.testing.assert_allclose(pm[:, 0, 0], 1 - p[:, 0, 0], atol=1e-6)   # nose stays
     assert sorted(POSE_MIRROR_PERM) == list(range(33))
     assert (POSE_MIRROR_PERM[POSE_MIRROR_PERM] == np.arange(33)).all()
+
+
+@pytest.mark.parametrize("face_mode", ["none", "subset", "full"])
+def test_mirror_matches_augmentation_after_normalization(face_mode):
+    # --mirror on raw ISLR clips and mirror augmentation on normalized
+    # sequences are written separately; they must be the same transform
+    rng = np.random.default_rng(4)
+    df = to_islr_frame(make_landmarks(30, rng, missing=("left_hand",)))
+    plain = SequenceBuilder.normalize_sequence(islr_to_sequence(df, face_mode))
+    mirrored = SequenceBuilder.normalize_sequence(islr_to_sequence(df, face_mode, mirror=True))
+    np.testing.assert_allclose(mirror(plain), mirrored, atol=1e-5)
 
 
 @pytest.fixture

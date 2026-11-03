@@ -7,11 +7,17 @@ All augmentations operate on numpy arrays of shape (T, D) where:
   T = sequence length (e.g. 30 frames)
   D = feature dimension (e.g. 258 for pose + hands)
 
+They expect NORMALIZED sequences (SequenceBuilder.normalize_sequence): the
+origin is the signer's mid-shoulder point and the unit is the shoulder width,
+so x = 0 is the body's midline. Missing landmarks are zeros and stay zeros.
+
 Authors: Estifanos Behailu
 """
 
 import numpy as np
 from typing import Optional
+
+from src.landmark_layout import mirror, coordinate_mask
 
 
 # ---------------------------------------------------------------------------
@@ -20,11 +26,9 @@ from typing import Optional
 
 def mirror_horizontal(sequence: np.ndarray) -> np.ndarray:
     """
-    Flip the sequence left-right by negating all x-coordinates.
-
-    Convention: MediaPipe x-coords are in [0, 1] relative to frame width.
-    Flipping x → 1 - x mirrors the signer horizontally, which effectively
-    swaps left/right handedness and doubles the dataset.
+    Mirror the signer left-right: x -> -x about the body's midline, and the
+    left and right hands (and left/right pose and face points) swap channels,
+    giving the left-handed version of the sign.
 
     Parameters
     ----------
@@ -34,33 +38,27 @@ def mirror_horizontal(sequence: np.ndarray) -> np.ndarray:
     -------
     flipped : np.ndarray of shape (T, D)
     """
-    flipped = sequence.copy()
-    # x-coords are at every 4th value for pose (x, y, z, vis),
-    # every 3rd value for hands (x, y, z).
-    # For simplicity, we flip ALL x-coords by finding indices divisible by 3 or 4.
-    # A safe approximation: negate every element that represents x in [0,1] range.
-    # Since sequences are z-normalized, we instead negate the first component
-    # of each landmark group.
-    # Practical implementation: negate the full x-component slice.
-    flipped[:, 0::3] = 1.0 - flipped[:, 0::3]   # approximate x-flip
-    return flipped
+    return mirror(sequence)
 
 
-def add_noise(sequence: np.ndarray, noise_std: float = 0.005) -> np.ndarray:
+def add_noise(sequence: np.ndarray, noise_std: float = 0.02) -> np.ndarray:
     """
-    Add small Gaussian noise to all landmarks to improve robustness.
+    Add small Gaussian noise to every detected landmark coordinate, like
+    MediaPipe's frame-to-frame jitter. Visibility and missing landmarks
+    are left alone.
 
     Parameters
     ----------
     sequence : np.ndarray of shape (T, D)
     noise_std : float
-        Standard deviation of the Gaussian noise (in normalized coords).
+        Standard deviation of the Gaussian noise, in shoulder widths.
 
     Returns
     -------
     noisy : np.ndarray of shape (T, D)
     """
     noise = np.random.normal(0, noise_std, size=sequence.shape).astype(np.float32)
+    noise *= (sequence != 0) & coordinate_mask(sequence.shape[1])
     return sequence + noise
 
 
@@ -69,7 +67,9 @@ def temporal_jitter(
     max_shift: int = 3,
 ) -> np.ndarray:
     """
-    Shift the sequence in time by a random amount (roll with wrap-around).
+    Shift the sequence in time by a random amount, as if the sign started a
+    little earlier or later in the window. Frames shifted in repeat the
+    first or last frame (no wrap-around from the other end).
 
     Parameters
     ----------
@@ -82,7 +82,8 @@ def temporal_jitter(
     shifted : np.ndarray of shape (T, D)
     """
     shift = np.random.randint(-max_shift, max_shift + 1)
-    return np.roll(sequence, shift, axis=0)
+    idx = np.clip(np.arange(len(sequence)) - shift, 0, len(sequence) - 1)
+    return sequence[idx]
 
 
 def scale_landmarks(
@@ -90,7 +91,10 @@ def scale_landmarks(
     scale_range: tuple = (0.85, 1.15),
 ) -> np.ndarray:
     """
-    Randomly scale all landmark coordinates (simulates signer distance).
+    Randomly scale all landmark coordinates about the mid-shoulder point
+    (simulates signers with longer or shorter arms relative to their
+    shoulders; distance from the camera is already removed by normalization).
+    Visibility is not scaled; missing landmarks stay zero.
 
     Parameters
     ----------
@@ -102,7 +106,7 @@ def scale_landmarks(
     scaled : np.ndarray of shape (T, D)
     """
     scale = np.random.uniform(*scale_range)
-    return sequence * scale
+    return np.where(coordinate_mask(sequence.shape[1]), sequence * scale, sequence)
 
 
 def dropout_frames(
@@ -110,7 +114,8 @@ def dropout_frames(
     dropout_prob: float = 0.1,
 ) -> np.ndarray:
     """
-    Randomly zero out entire frames to simulate occlusion.
+    Randomly zero out entire frames, the same as a frame in which MediaPipe
+    detected nothing.
 
     Parameters
     ----------
@@ -141,7 +146,7 @@ class AugmentationPipeline:
     mirror_prob : float
         Probability of applying horizontal mirror.
     noise_std : float
-        Standard deviation of Gaussian noise. Set to 0 to disable.
+        Standard deviation of Gaussian noise, in shoulder widths. Set to 0 to disable.
     jitter_frames : int
         Max frame shift for temporal jitter. Set to 0 to disable.
     scale_range : tuple or None
@@ -153,7 +158,7 @@ class AugmentationPipeline:
     def __init__(
         self,
         mirror_prob: float = 0.5,
-        noise_std: float = 0.005,
+        noise_std: float = 0.02,
         jitter_frames: int = 3,
         scale_range: Optional[tuple] = (0.85, 1.15),
         dropout_prob: float = 0.1,

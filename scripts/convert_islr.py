@@ -296,8 +296,16 @@ def main():
     print(f"Converted: {len(clips)} clips ({len(ok) - len(clips)} missing or failed)")
 
     # ── Assemble the dataset ────────────────────────────────────────────
-    raw = np.stack([np.load(clip_dir / f"{sid}.npy") for sid in clips["sequence_id"]])
-    X = np.stack([SequenceBuilder.normalize_sequence(s) for s in raw]).astype(np.float32)
+    # Filled in place: the full dataset is ~3 GB, too big to hold several copies of
+    first = np.load(clip_dir / f"{clips['sequence_id'].iloc[0]}.npy")
+    X = np.empty((len(clips), *first.shape), np.float32)
+    lh_frames = rh_frames = 0
+    for i, sid in enumerate(tqdm(clips["sequence_id"], desc="Assembling")):
+        raw = np.load(clip_dir / f"{sid}.npy")
+        lh, rh = hand_presence(raw)
+        lh_frames, rh_frames = lh_frames + lh, rh_frames + rh
+        X[i] = SequenceBuilder.normalize_sequence(raw)
+    lh, rh = lh_frames / len(clips), rh_frames / len(clips)
     y = clips["sign"].map(sign_to_id).to_numpy(np.int32)
     participants = clips["participant_id"].to_numpy().astype(str)
 
@@ -307,7 +315,6 @@ def main():
     with open(output_dir / "signs.json", "w") as f:
         json.dump(signs, f, indent=2)
 
-    lh, rh = hand_presence(raw)
     with open(output_dir / "dataset_stats.json", "w") as f:
         json.dump({
             "source": f"kaggle competition {COMPETITION}",

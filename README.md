@@ -156,7 +156,7 @@ The ID is stored in each clip's filename and is what makes the
 signer-independent evaluation possible, so never record without it or reuse
 another person's ID.
 
-Each clip is 1.5 s (`SIGN_WINDOW_SECONDS`) saved as a compressed `.mp4`
+Each clip is 2.5 s (`SIGN_WINDOW_SECONDS`) saved as a compressed `.mp4`
 (~1.7 MB), so landmarks can be re-extracted later with other settings
 without re-recording.
 

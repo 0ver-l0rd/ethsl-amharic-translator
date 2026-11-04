@@ -51,6 +51,7 @@ Thumbs.db
 data/raw_cesl/
 data/islr_raw/
 data/islr/
+data/dictionary/
 models/pretrained/*.json
 models/**/*.keras
 models/**/*.h5

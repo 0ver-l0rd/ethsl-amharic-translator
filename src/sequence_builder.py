@@ -25,7 +25,8 @@ from src.landmark_layout import body_relative
 
 
 SEQUENCE_LENGTH     = 30   # frames per sign sequence fed to the model
-SIGN_WINDOW_SECONDS = 1.5  # real time covered by one sign sequence
+SIGN_WINDOW_SECONDS = 2.5  # real time covered by one sign sequence; holds 91% of the
+                           # AAU dictionary signs (1.5 s held only 34%)
 MIN_WINDOW_FRAMES   = 8    # fewer real frames than this per window is too sparse to classify
 FEATURE_DIM = 258          # default: pose(132) + lh(63) + rh(63)
 

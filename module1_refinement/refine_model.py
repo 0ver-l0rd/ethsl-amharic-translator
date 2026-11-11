@@ -46,6 +46,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from model_architectures import build_model, MODEL_REGISTRY
 from src.augmentation import AugmentationPipeline
+from src.vocabulary import Vocabulary
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -198,7 +199,9 @@ def train(cfg: dict, from_scratch: bool):
     tf.random.set_seed(cfg["training"]["seed"])
     np.random.seed(cfg["training"]["seed"])
 
-    num_classes = cfg["data"]["num_classes"]
+    # The vocabulary decides the number of classes, not the config file
+    num_classes = Vocabulary(cfg["data"]["vocabulary"]).num_classes
+    cfg["data"]["num_classes"] = num_classes
     output_dir  = Path(cfg["output"]["model_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
 

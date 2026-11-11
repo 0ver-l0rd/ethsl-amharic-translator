@@ -10,7 +10,7 @@ data:
   vocabulary:    "../data/vocabulary.json"
   sequence_length: 30          # frames per sign window
   feature_dim:     258         # pose(132) + lh(63) + rh(63)
-  num_classes:     60          # must match vocabulary.json
+  num_classes:     13          # informational: read from vocabulary.json at run time
 
 # ── Pretrained weights ──────────────────────────────────────────────────────
 pretrained:

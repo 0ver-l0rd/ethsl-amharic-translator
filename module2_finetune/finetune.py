@@ -240,6 +240,8 @@ def main():
     args = parser.parse_args()
 
     cfg = load_config(args.config)
+    # The vocabulary decides the number of classes, not the config file
+    cfg["data"]["num_classes"] = Vocabulary(cfg["data"]["vocabulary"]).num_classes
     tf.random.set_seed(cfg["training"]["seed"])
     np.random.seed(cfg["training"]["seed"])
 

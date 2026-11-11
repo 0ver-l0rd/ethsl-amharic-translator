@@ -167,6 +167,25 @@ python scripts/preprocess.py                       # also writes data/processed/
 python scripts/split_dataset.py                    # --holdout_signer s04 to pick the test signer
 ```
 
+**Gonfa et al. dataset.** The isolated-word EthSL dataset of Gonfa et al.,
+*Scientific Reports* 15:36181 (2025), is 7 signers x 40 clips per word, already
+as MediaPipe landmarks. It was shared with us for non-commercial use on
+condition that it is not redistributed, so it is never committed. Convert it
+in place of `collect_data.py` + `extract_landmarks.py`; this also rewrites
+`data/vocabulary.json` to the words that have data:
+
+```bash
+python scripts/convert_gonfa.py --dataset_dir "<folder with the EthSL_Dataset download parts>"
+```
+
+**Signer-independent accuracy.** Train on all signers but one, test on that
+one, for every signer in turn:
+
+```bash
+cd module2_finetune
+python leave_one_signer_out.py --arch lstm --pretrained ../models/pretrained/islr_lstm.h5 --tag lstm_islr
+```
+
 **Face landmarks** (`--face`), compared as an experiment in Module 2:
 
 | Mode | Face points | Features / frame |
@@ -228,7 +247,9 @@ See `module2_finetune/README.md` for full details.
 
 ## Vocabulary
 
-The system targets **50-100 common EthSL signs** covering:
+The system targets **50-100 common EthSL signs**. `data/vocabulary.json` is
+currently written by `scripts/convert_gonfa.py` (13 words from the Gonfa et al.
+dataset); the planned everyday words are:
 
 | Category | Examples (Amharic) |
 |---|---|

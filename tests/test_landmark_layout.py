@@ -156,6 +156,22 @@ def test_temporal_jitter_pads_with_edge_frames():
         assert set(np.diff(shifted)) <= {0.0, 1.0}
 
 
+def test_time_stretch_keeps_order_and_missing():
+    seq = np.repeat(np.arange(T, dtype=np.float32)[:, None] + 1, 258, axis=1)
+    seq[:, 132:195] = 0.0
+    for _ in range(20):
+        out = aug.time_stretch(seq, speed_range=(0.7, 1.4))
+        assert out.shape == seq.shape
+        assert (np.diff(out[:, 0]) >= 0).all()
+        assert (out[:, 132:195] == 0).all()
+
+
+def test_time_stretch_speeds_up_motion():
+    seq = np.repeat(np.arange(T, dtype=np.float32)[:, None] + 1, 258, axis=1)
+    out = aug.time_stretch(seq, speed_range=(1.25, 1.25))
+    np.testing.assert_allclose(np.diff(out[10:20, 0]), 1.25, atol=1e-4)
+
+
 def test_scale_leaves_visibility_and_missing():
     seq = body_relative(raw_sequence(missing_lh=[0]))
     scaled = aug.scale_landmarks(seq, scale_range=(1.1, 1.1))

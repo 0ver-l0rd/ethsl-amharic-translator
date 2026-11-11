@@ -18,6 +18,7 @@ import numpy as np
 from typing import Optional
 
 from src.landmark_layout import mirror, coordinate_mask
+from src.sequence_builder import _resample
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +87,32 @@ def temporal_jitter(
     return sequence[idx]
 
 
+def time_stretch(
+    sequence: np.ndarray,
+    speed_range: tuple = (0.7, 1.4),
+) -> np.ndarray:
+    """
+    Play the sign faster or slower about the middle of the window, as if it
+    were signed at a different pace or filmed over a different duration.
+    Above speed 1 the ends repeat the first or last frame; below 1 the ends
+    of the sequence are cut off.
+
+    Parameters
+    ----------
+    sequence : np.ndarray of shape (T, D)
+    speed_range : tuple (min_speed, max_speed)
+
+    Returns
+    -------
+    stretched : np.ndarray of shape (T, D)
+    """
+    speed = np.random.uniform(*speed_range)
+    times = np.arange(len(sequence), dtype=np.float64)
+    middle = times[-1] / 2
+    targets = np.clip(middle + (times - middle) * speed, 0, times[-1])
+    return _resample(times, sequence, targets)
+
+
 def scale_landmarks(
     sequence: np.ndarray,
     scale_range: tuple = (0.85, 1.15),
@@ -149,6 +176,8 @@ class AugmentationPipeline:
         Standard deviation of Gaussian noise, in shoulder widths. Set to 0 to disable.
     jitter_frames : int
         Max frame shift for temporal jitter. Set to 0 to disable.
+    speed_range : tuple or None
+        (min, max) playback speed. Set to None to disable.
     scale_range : tuple or None
         (min, max) scale range. Set to None to disable.
     dropout_prob : float
@@ -160,12 +189,14 @@ class AugmentationPipeline:
         mirror_prob: float = 0.5,
         noise_std: float = 0.02,
         jitter_frames: int = 3,
+        speed_range: Optional[tuple] = (0.7, 1.4),
         scale_range: Optional[tuple] = (0.85, 1.15),
         dropout_prob: float = 0.1,
     ):
         self.mirror_prob   = mirror_prob
         self.noise_std     = noise_std
         self.jitter_frames = jitter_frames
+        self.speed_range   = speed_range
         self.scale_range   = scale_range
         self.dropout_prob  = dropout_prob
 
@@ -177,6 +208,8 @@ class AugmentationPipeline:
             sequence = add_noise(sequence, noise_std=self.noise_std)
         if self.jitter_frames > 0:
             sequence = temporal_jitter(sequence, max_shift=self.jitter_frames)
+        if self.speed_range is not None:
+            sequence = time_stretch(sequence, speed_range=self.speed_range)
         if self.scale_range is not None:
             sequence = scale_landmarks(sequence, scale_range=self.scale_range)
         if self.dropout_prob > 0:

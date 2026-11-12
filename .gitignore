@@ -22,7 +22,8 @@ data/processed/
 
 # Trained model weights (store in releases or DVC)
 models/refined/*.h5
-models/finetuned/*.h5
+# Fine-tuning output: models, checkpoints, results
+models/finetuned/
 models/pretrained/*.h5
 models/pretrained/*.pt
 

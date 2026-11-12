@@ -57,6 +57,7 @@ ETHIOPIC_FONT_CANDIDATES = [
     "/usr/share/fonts/noto/NotoSansEthiopic-Regular.ttf",
     "/Library/Fonts/NotoSansEthiopic-Regular.ttf",
     "/System/Library/Fonts/Supplemental/Kefa.ttc",
+    "/System/Library/Fonts/Supplemental/KefaIII.ttf",
 ]
 
 

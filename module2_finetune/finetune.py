@@ -109,15 +109,20 @@ def train_model(arch: str, cfg: dict, train: tuple, val: tuple, run_dir: Path):
     ft_cfg       = cfg["finetune"]
     tr_cfg       = cfg["training"]
 
-    # Build or load model
+    # Build the model; with a pretrained model of the same architecture, copy
+    # its encoder weights. Its output layer is left out: it was trained on a
+    # different vocabulary (e.g. 250 ISLR signs) and has the wrong size here.
+    model = build_model(arch, num_classes=num_classes,
+                         sequence_length=seq_len, feature_dim=feat_dim)
     pretrained_path = Path(cfg["pretrained"]["path"])
     if pretrained_path.exists() and cfg["pretrained"]["architecture"] == arch:
-        print(f"  Loading pretrained: {pretrained_path}")
-        model = keras.models.load_model(str(pretrained_path))
+        print(f"  Copying pretrained encoder weights: {pretrained_path}")
+        base = keras.models.load_model(str(pretrained_path))
+        for layer in model.layers:
+            if layer.name != "output" and layer.get_weights():
+                layer.set_weights(base.get_layer(layer.name).get_weights())
     else:
         print(f"  Building fresh {arch.upper()} model")
-        model = build_model(arch, num_classes=num_classes,
-                             sequence_length=seq_len, feature_dim=feat_dim)
 
     # Freeze layers if requested
     n_freeze = ft_cfg.get("frozen_layers", 0)

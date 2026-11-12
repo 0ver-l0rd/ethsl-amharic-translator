@@ -185,7 +185,9 @@ python scripts/split_recording.py s01_01.mp4 --label selam   # then extract_land
 as MediaPipe landmarks. It was shared with us for non-commercial use on
 condition that it is not redistributed, so it is never committed. Convert it
 in place of `collect_data.py` + `extract_landmarks.py`; this also rewrites
-`data/vocabulary.json` to the words that have data:
+`data/vocabulary.json` to the words that have data. Its signers are named
+`g01`-`g07`, so they never share an ID with our own `s01`, `s02`, ...;
+re-running it replaces its earlier output but keeps our recorded clips:
 
 ```bash
 python scripts/convert_gonfa.py --dataset_dir "<folder with the EthSL_Dataset download parts>"

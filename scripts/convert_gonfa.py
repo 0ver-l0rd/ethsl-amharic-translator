@@ -16,7 +16,10 @@ Output: data/landmarks/<label>/<signer>_seq_XXX_kp.npy
         data/vocabulary.json
 
 Each word's clips are in signer order, 40 per signer, so clip // 40 is the
-signer. Frames are stored as pose, face, left hand, right hand; our layout is
+signer. Gonfa signers are named g01-g07 so they never share an ID with our own
+signers (s01, s02, ...); a shared ID would merge two people in the
+signer-independent evaluation. Re-running replaces earlier converter output
+(landmark files with no video beside them) but keeps our recorded clips. Frames are stored as pose, face, left hand, right hand; our layout is
 pose, left hand, right hand, face. Clips with missing frames are skipped.
 
 Usage:
@@ -46,6 +49,7 @@ OUTPUT_DIR = Path(__file__).parent.parent / "data" / "landmarks"
 VOCAB_PATH = Path(__file__).parent.parent / "data" / "vocabulary.json"
 
 CLIPS_PER_SIGNER = 40
+SIGNER_PREFIX = "g"      # g01-g07; our own signers are s01, s02, ...
 SOURCE_DIM = FEATURE_DIM_NO_FACE + FACE_LANDMARKS * 3
 
 # Amharic word: (category, label, English)
@@ -105,6 +109,22 @@ def convert_clip(job) -> bool:
     return True
 
 
+def remove_old_outputs(label_dir: Path) -> int:
+    """
+    Delete earlier converter output in a sign folder: landmark files with no
+    recorded video beside them (any signer prefix, so the old s01-s07 names
+    go too). Our own clips keep their .mp4 next to the _kp.npy, so they stay.
+    Returns the number of files removed.
+    """
+    removed = 0
+    for kp in label_dir.glob("*_seq_*_kp.npy"):
+        stem = kp.name[: -len("_kp.npy")]
+        if not any((label_dir / f"{stem}{ext}").exists() for ext in (".mp4", ".npy")):
+            kp.unlink()
+            removed += 1
+    return removed
+
+
 def write_vocabulary(path: Path, words: list) -> None:
     """Write vocabulary.json for `words`, grouped by category with contiguous IDs."""
     signs = defaultdict(list)
@@ -146,10 +166,11 @@ def main():
     if unknown:
         sys.exit(f"ERROR: words missing from the WORDS table: {unknown}")
 
-    jobs, per_word, incomplete = [], {}, 0
+    jobs, per_word, incomplete, removed = [], {}, 0, 0
     for word, by_clip in clips.items():
         label = WORDS[word][1]
         (output_dir / label).mkdir(parents=True, exist_ok=True)
+        removed += remove_old_outputs(output_dir / label)
         complete = 0
         for clip, frames in sorted(by_clip.items()):
             # A few clips have stray extra frames past the last one; they are ignored
@@ -157,13 +178,15 @@ def main():
                 incomplete += 1
                 continue
             complete += 1
-            signer = f"s{clip // CLIPS_PER_SIGNER + 1:02d}"
+            signer = f"{SIGNER_PREFIX}{clip // CLIPS_PER_SIGNER + 1:02d}"
             out = output_dir / label / f"{signer}_seq_{clip % CLIPS_PER_SIGNER:03d}_kp.npy"
             jobs.append(([frames[i] for i in range(SEQUENCE_LENGTH)], out, args.face))
         per_word[word] = complete
 
     print(f"Words with data: {len(per_word)} of {len(WORDS)}")
     print(f"Complete clips:  {len(jobs)}  (incomplete, skipped: {incomplete})")
+    if removed:
+        print(f"Removed {removed} files from an earlier conversion")
     with ThreadPoolExecutor(args.workers) as pool:
         results = list(tqdm(pool.map(convert_clip, jobs), total=len(jobs), desc="Converting"))
     if not all(results):

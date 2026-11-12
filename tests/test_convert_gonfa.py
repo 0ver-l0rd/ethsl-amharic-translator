@@ -82,10 +82,21 @@ def convert(dl, tmp_path, monkeypatch):
 def test_clips_named_by_signer_and_merged_across_parts(fake_download, tmp_path, monkeypatch):
     out, _ = convert(fake_download, tmp_path, monkeypatch)
     names = {p.relative_to(out).as_posix() for p in out.rglob("*.npy")}
-    assert names == {"lemin/s01_seq_000_kp.npy", "lemin/s02_seq_001_kp.npy",
-                     "hazen/s07_seq_039_kp.npy", "hazen/s01_seq_005_kp.npy"}
-    assert parse_signer(out / "lemin" / "s02_seq_001_kp.npy") == "s02"
-    assert np.load(out / "hazen" / "s07_seq_039_kp.npy").shape == (30, 258)
+    assert names == {"lemin/g01_seq_000_kp.npy", "lemin/g02_seq_001_kp.npy",
+                     "hazen/g07_seq_039_kp.npy", "hazen/g01_seq_005_kp.npy"}
+    assert parse_signer(out / "lemin" / "g02_seq_001_kp.npy") == "g02"
+    assert np.load(out / "hazen" / "g07_seq_039_kp.npy").shape == (30, 258)
+
+
+def test_rerun_replaces_old_output_but_keeps_our_recordings(fake_download, tmp_path, monkeypatch):
+    lemin = tmp_path / "landmarks" / "lemin"
+    lemin.mkdir(parents=True)
+    (lemin / "s01_seq_000_kp.npy").touch()        # old converter output (s01-s07 names)
+    (lemin / "s03_seq_002.mp4").touch()           # our own recording ...
+    (lemin / "s03_seq_002_kp.npy").touch()        # ... and its landmarks
+    out, _ = convert(fake_download, tmp_path, monkeypatch)
+    names = {p.name for p in (out / "lemin").iterdir()}
+    assert names == {"g01_seq_000_kp.npy", "g02_seq_001_kp.npy", "s03_seq_002.mp4", "s03_seq_002_kp.npy"}
 
 
 def test_vocabulary_lists_only_words_with_data(fake_download, tmp_path, monkeypatch):

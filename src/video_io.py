@@ -13,7 +13,7 @@ Authors: EthSL Team
 
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 import cv2
 import numpy as np
@@ -26,21 +26,32 @@ import numpy as np
 _WRITERS = ([(cv2.CAP_MSMF, "avc1")] if sys.platform == "win32" else []) + [(cv2.CAP_FFMPEG, "mp4v")]
 
 
+def open_clip_writer(path: Path, fps: float, size: Tuple[int, int]) -> Tuple[cv2.VideoWriter, str]:
+    """
+    Open an .mp4 writer for frames of the given (width, height), so frames can
+    be streamed to disk one at a time. Returns (writer, codec); the caller
+    writes frames and calls writer.release(). Raises RuntimeError if no codec
+    is available.
+    """
+    for backend, codec in _WRITERS:
+        writer = cv2.VideoWriter(str(path), backend, cv2.VideoWriter_fourcc(*codec), fps, size)
+        if writer.isOpened():
+            return writer, codec
+        writer.release()
+    raise RuntimeError(f"No usable video writer for {path} (tried {[c for _, c in _WRITERS]})")
+
+
 def write_clip(path: Path, frames: List[np.ndarray], fps: float) -> str:
     """
     Write BGR frames to an .mp4 file at the given frame rate.
     Returns the codec used. Raises RuntimeError if no codec is available.
     """
     h, w = frames[0].shape[:2]
-    for backend, codec in _WRITERS:
-        writer = cv2.VideoWriter(str(path), backend, cv2.VideoWriter_fourcc(*codec), fps, (w, h))
-        if writer.isOpened():
-            for frame in frames:
-                writer.write(frame)
-            writer.release()
-            return codec
-        writer.release()
-    raise RuntimeError(f"No usable video writer for {path} (tried {[c for _, c in _WRITERS]})")
+    writer, codec = open_clip_writer(path, fps, (w, h))
+    for frame in frames:
+        writer.write(frame)
+    writer.release()
+    return codec
 
 
 def read_clip(path: Path) -> List[np.ndarray]:

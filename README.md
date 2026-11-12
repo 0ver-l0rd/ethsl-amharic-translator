@@ -57,6 +57,7 @@ ethsl-amharic-translator/
 |
 |-- scripts/
 |   |-- collect_data.py         # Record sign clips via webcam
+|   |-- split_recording.py      # Split a phone video of repeated signs into clips
 |   |-- extract_landmarks.py    # MediaPipe Holistic extraction pipeline
 |   |-- preprocess.py           # Normalize + build fixed-length sequences
 |   |-- split_dataset.py        # Create signer-dependent/independent splits
@@ -165,6 +166,18 @@ python scripts/collect_data.py --signer s01        # each team member uses their
 python scripts/extract_landmarks.py --face subset  # --face none | subset | full (see below)
 python scripts/preprocess.py                       # also writes data/processed/signer_ids.npy
 python scripts/split_dataset.py                    # --holdout_signer s04 to pick the test signer
+```
+
+**Phone recordings.** Instead of `collect_data.py`, a word can be recorded on
+a phone as one landscape video of 15 repetitions, with the hands fully down for
+about a second between them, named `<signer>_<word>.mp4` (e.g. `s01_01.mp4`).
+`split_recording.py` finds the repetitions from the hand landmarks and saves a
+2.5 s clip around each one, in the same place `collect_data.py` would. It
+writes nothing unless it finds the expected count, so dry-run it first:
+
+```bash
+python scripts/split_recording.py s01_01.mp4 --label selam --dry_run --plot
+python scripts/split_recording.py s01_01.mp4 --label selam   # then extract_landmarks.py as above
 ```
 
 **Gonfa et al. dataset.** The isolated-word EthSL dataset of Gonfa et al.,

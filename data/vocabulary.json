@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "2.0",
-    "total_signs": 13,
+    "total_signs": 15,
     "language": "Ethiopian Sign Language (EthSL)",
     "output_language": "Amharic",
     "reference": "Gonfa et al., Scientific Reports 15:36181 (2025)",
@@ -38,6 +38,12 @@
         "amharic": "መጨነቅ",
         "description": "To worry",
         "id": 3
+      },
+      {
+        "label": "himem",
+        "amharic": "ህመም",
+        "description": "Pain / illness",
+        "id": 4
       }
     ],
     "questions": [
@@ -45,7 +51,7 @@
         "label": "lemin",
         "amharic": "ለምን",
         "description": "Why",
-        "id": 4
+        "id": 5
       }
     ],
     "actions": [
@@ -53,31 +59,31 @@
         "label": "limimid",
         "amharic": "ልምምድ",
         "description": "Practice",
-        "id": 5
+        "id": 6
       },
       {
         "label": "mejemer",
         "amharic": "መጀመር",
         "description": "To start",
-        "id": 6
+        "id": 7
       },
       {
         "label": "mecheres",
         "amharic": "መጨረስ",
         "description": "To finish",
-        "id": 7
+        "id": 8
       },
       {
         "label": "mashenef",
         "amharic": "ማሸነፍ",
         "description": "To win",
-        "id": 8
+        "id": 9
       },
       {
         "label": "tenes",
         "amharic": "ተነስ",
         "description": "Stand up",
-        "id": 9
+        "id": 10
       }
     ],
     "social": [
@@ -85,7 +91,7 @@
         "label": "misgana",
         "amharic": "ምስጋና",
         "description": "Thanks",
-        "id": 10
+        "id": 11
       }
     ],
     "descriptive": [
@@ -93,13 +99,19 @@
         "label": "merara",
         "amharic": "መራራ",
         "description": "Bitter",
-        "id": 11
+        "id": 12
+      },
+      {
+        "label": "metfo",
+        "amharic": "መጥፎ",
+        "description": "Bad",
+        "id": 13
       },
       {
         "label": "kelal",
         "amharic": "ቀላል",
         "description": "Easy",
-        "id": 12
+        "id": 14
       }
     ]
   }

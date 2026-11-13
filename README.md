@@ -263,7 +263,7 @@ See `module2_finetune/README.md` for full details.
 ## Vocabulary
 
 The system targets **50-100 common EthSL signs**. `data/vocabulary.json` is
-currently written by `scripts/convert_gonfa.py` (13 words from the Gonfa et al.
+currently written by `scripts/convert_gonfa.py` (15 words from the Gonfa et al.
 dataset); the planned everyday words are:
 
 | Category | Examples (Amharic) |

@@ -19,10 +19,10 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from split_recording import (
-    POSE_DIMS, HAND_DIMS, LEFT_WRIST, RIGHT_WRIST,
     parse_recording_name, find_repetitions, clip_window, existing_clips, write_clips,
 )
-from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER
+from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER, POSE_DIMS
+from src.sign_spotter import HAND_DIMS, LEFT_WRIST, RIGHT_WRIST
 
 FPS = 30
 

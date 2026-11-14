@@ -76,16 +76,16 @@ class InferenceEngine:
         amharic : str or None
         confidence : float
         """
-        probs    = self._probs(sequence)
-        class_id = int(np.argmax(probs))
-        conf     = float(probs[class_id])
-
+        label, amharic, conf = self.best_guess(sequence)
         if conf < self.threshold:
             return None, None, conf
-
-        label   = self.vocab.id_to_label(class_id)
-        amharic = self.vocab.id_to_amharic(class_id)
         return label, amharic, conf
+
+    def best_guess(self, sequence: np.ndarray) -> Tuple[str, str, float]:
+        """(label, amharic, confidence) of the most likely sign, ignoring the threshold."""
+        probs    = self._probs(sequence)
+        class_id = int(np.argmax(probs))
+        return self.vocab.id_to_label(class_id), self.vocab.id_to_amharic(class_id), float(probs[class_id])
 
     def predict_top_k(self, sequence: np.ndarray, k: int = 3):
         """Return top-k predictions as list of (label, amharic, confidence)."""

@@ -49,6 +49,14 @@ def _resample(times: np.ndarray, frames: np.ndarray, targets: np.ndarray) -> np.
     return np.where((a != 0) & (b != 0), blended, nearest).astype(np.float32)
 
 
+def resample_window(times: np.ndarray, frames: np.ndarray, start: float, end: float,
+                    sequence_length: int = SEQUENCE_LENGTH) -> np.ndarray:
+    """Frames (T, D) sampled at `times`, resampled to `sequence_length` evenly spaced
+    frames from `start` to `end`; before the first or after the last frame, the
+    nearest frame is repeated."""
+    return _resample(times, frames, np.linspace(start, end, sequence_length))
+
+
 class SequenceBuilder:
     """
     Maintains a rolling, timestamped buffer of landmark frames and builds
@@ -115,8 +123,7 @@ class SequenceBuilder:
         times  = np.array([t for t, _ in self._buffer])
         frames = np.array([kp for _, kp in self._buffer], dtype=np.float32)
         end = times[-1]
-        targets = np.linspace(end - self.window_seconds, end, self.sequence_length)
-        return _resample(times, frames, targets)
+        return resample_window(times, frames, end - self.window_seconds, end, self.sequence_length)
 
     def reset(self) -> None:
         """Clear the buffer (call after a sign is recognised)."""

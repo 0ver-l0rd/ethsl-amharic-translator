@@ -18,12 +18,15 @@ env/
 # Raw data (large files, store externally or in DVC)
 data/raw/
 data/landmarks/
+# Uploaded videos and the name -> signer ID table: personal data, never commit
+data/contributions/
 data/processed/
 
 # Trained model weights (store in releases or DVC)
 models/refined/*.h5
 # Fine-tuning output: models, checkpoints, results
 models/finetuned/
+models/candidate/
 models/pretrained/*.h5
 models/pretrained/*.pt
 

@@ -40,16 +40,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import clip_filename, next_clip_index, parse_signer, validate_signer_id
-from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER
 from src.sequence_builder import SIGN_WINDOW_SECONDS
+from src.sign_spotter import activity_signal   # shared with the live app
 from src.video_io import open_clip_writer
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "landmarks"
 VOCAB_PATH = Path(__file__).parent.parent / "data" / "vocabulary.json"
-
-LEFT_WRIST, RIGHT_WRIST = 15, 16
-POSE_DIMS = 33 * 4
-HAND_DIMS = 63
 
 ANALYSIS_FPS  = 30     # frames per second MediaPipe looks at to find the signs
 OUTPUT_FPS    = 30     # frame rate of the saved clips
@@ -83,29 +79,6 @@ def parse_recording_name(path: Path) -> Tuple[str, str]:
             f"Name recordings <signer>_<word>, e.g. s01_01.mp4 or s02_E1.mov, or pass --signer."
         )
     return m.group("signer"), m.group("word")
-
-
-def activity_signal(keypoints: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Per-frame wrist height and hand tracking from (T, >=258) keypoints in the
-    extractor's layout (pose 33x4, left hand, right hand).
-
-    Returns (height, hand, pose_ok): height is the higher wrist above the
-    mid-shoulder point in shoulder widths (image y points down, so it is
-    negated); hand is True where either hand was detected; pose_ok is False
-    where no body was found (height is then meaningless).
-    """
-    pose = keypoints[:, :POSE_DIMS].reshape(-1, 33, 4)
-    ls, rs = pose[:, LEFT_SHOULDER, :2], pose[:, RIGHT_SHOULDER, :2]
-    width = np.linalg.norm(ls - rs, axis=1)
-    pose_ok = width > 1e-6
-    mid_y = (ls[:, 1] + rs[:, 1]) / 2
-    wrist_y = np.minimum(pose[:, LEFT_WRIST, 1], pose[:, RIGHT_WRIST, 1])
-    height = np.where(pose_ok, (mid_y - wrist_y) / np.maximum(width, 1e-6), -np.inf)
-
-    hands = keypoints[:, POSE_DIMS:POSE_DIMS + 2 * HAND_DIMS]
-    hand = (np.abs(hands[:, :HAND_DIMS]).sum(1) > 0) | (np.abs(hands[:, HAND_DIMS:]).sum(1) > 0)
-    return height, hand, pose_ok
 
 
 def find_repetitions(

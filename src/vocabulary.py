@@ -11,12 +11,50 @@ Authors: Estifanos Behailu, Emanuel Solomon
 
 import json
 import os
+import re
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 
 VOCABULARY_PATH = os.path.join(
     os.path.dirname(__file__), "..", "data", "vocabulary.json"
 )
+
+
+LABEL_RE = re.compile(r"^[a-z][a-z0-9_]*$")   # folder-safe Latin label, e.g. selam, dehna_neh
+
+
+def add_word(vocab_path, label: str, amharic: str, description: str = "",
+             category: str = "everyday") -> int:
+    """
+    Add a sign to vocabulary.json with the next free ID and return the ID.
+    If the label is already there with the same Amharic, its ID is returned
+    unchanged. New signs always go last, so existing IDs (the model's output
+    order) never move.
+    """
+    if not LABEL_RE.match(label):
+        raise ValueError(f"Label '{label}' must be lower-case Latin letters, digits or _ "
+                         f"(starting with a letter), e.g. selam or dehna_neh.")
+    if not amharic.strip():
+        raise ValueError("The Amharic word is empty.")
+    path = Path(vocab_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    signs = [s for group in data["signs"].values() for s in group]
+    for s in signs:
+        if s["label"] == label:
+            if s["amharic"] != amharic.strip():
+                raise ValueError(f"Label '{label}' is already used for {s['amharic']}.")
+            return s["id"]
+        if s["amharic"] == amharic.strip():
+            raise ValueError(f"{amharic} is already in the vocabulary as '{s['label']}'.")
+    new_id = len(signs)
+    data["signs"].setdefault(category, []).append(
+        {"label": label, "amharic": amharic.strip(), "description": description.strip(), "id": new_id})
+    data["metadata"]["total_signs"] = new_id + 1
+    if category not in data["metadata"].setdefault("categories", []):
+        data["metadata"]["categories"].append(category)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return new_id
 
 
 class Vocabulary:

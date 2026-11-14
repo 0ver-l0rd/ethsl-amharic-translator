@@ -101,6 +101,26 @@ class AmharicTTS:
             print(f"[TTS Fallback] {text}")
             self._last_spoken = text
 
+    def to_file(self, text: str, folder: str) -> Optional[str]:
+        """
+        Save the speech for `text` as an MP3 in `folder` and return its path,
+        for playback in a browser. Each text is synthesized once and reused.
+        Returns None if gTTS is unavailable or fails (it needs the internet).
+        """
+        if not self._gtts_available:
+            return None
+        import hashlib
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, hashlib.sha1(f"{self.lang}:{text}".encode()).hexdigest()[:16] + ".mp3")
+        if not os.path.exists(path):
+            try:
+                self._gtts(text=text, lang=self.lang, slow=self.slow).save(path + ".part")
+                os.replace(path + ".part", path)
+            except Exception as e:
+                print(f"[AmharicTTS] gTTS error: {e}")
+                return None
+        return path
+
     def reset(self) -> None:
         """Reset last-spoken cache (forces next speak() to always play)."""
         self._last_spoken = None

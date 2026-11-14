@@ -3,24 +3,28 @@ app/ui.py
 ==========
 OpenCV-based display overlay for the real-time EthSL translator.
 
-Renders a sleek HUD showing:
-  - Current predicted sign (large Amharic-label display)
-  - Confidence bar
-  - Frame buffer fill indicator
+Renders a HUD showing:
+  - A status bar: ready / signing / recognising, or a notice such as
+    "Not sure - try again"
+  - The last recognised sign (large Amharic text) and its confidence
   - Rolling sentence history
-  - FPS counter
-  - Speech toggle indicator
+  - FPS counter and speech toggle indicator
 
 Authors: Menase Teshale
 """
 
 import os
+import sys
+from pathlib import Path
 from functools import lru_cache
 from typing import List, Optional
 
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.sign_spotter import Status
 
 
 # Color palette (BGR)
@@ -34,6 +38,7 @@ COLORS = {
     "gray":         (160, 160, 160),
     "black":        (0, 0, 0),
     "panel_bg":     (30, 30, 45),
+    "signing":      (255, 170, 60),
 }
 
 
@@ -156,6 +161,15 @@ def draw_rounded_rect(frame, pt1, pt2, color, radius=8, thickness=-1, alpha=0.6)
     cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
 
+# What the status bar says in each state: (text, colour)
+STATUS_TEXT = {
+    Status.NO_BODY:     ("Step into view of the camera", COLORS["gray"]),
+    Status.READY:       ("READY  -  raise your hands and sign", COLORS["accent"]),
+    Status.SIGNING:     ("SIGNING...  lower your hands when done", COLORS["signing"]),
+    Status.RECOGNISING: ("RECOGNISING...", COLORS["warning"]),
+}
+
+
 class SignLanguageUI:
     """
     HUD overlay renderer for the real-time EthSL translator.
@@ -172,11 +186,12 @@ class SignLanguageUI:
     def draw(
         self,
         frame: np.ndarray,
+        status: Status,
+        message: str,
         current_label: str,
         current_amharic: str,
         confidence: float,
         sentence_history: List[str],
-        buffer_fill: float,
         fps: float,
         speech_enabled: bool,
     ) -> np.ndarray:
@@ -186,11 +201,12 @@ class SignLanguageUI:
         Parameters
         ----------
         frame : np.ndarray  (H, W, 3) BGR
-        current_label : str
-        current_amharic : str
-        confidence : float  (0–1)
+        status : Status  what the sign spotter is doing
+        message : str  a short notice shown instead of the status (e.g. "Not sure"),
+            or "" for none
+        current_label, current_amharic : the last recognised sign ("" for none yet)
+        confidence : float  (0-1) of the last recognised sign
         sentence_history : list of Amharic strings
-        buffer_fill : float  (0–1), current buffer fill ratio
         fps : float
         speech_enabled : bool
 
@@ -201,85 +217,59 @@ class SignLanguageUI:
         H, W = frame.shape[:2]
 
         # ── Top panel ──────────────────────────────────────────────────
-        draw_rounded_rect(frame, (0, 0), (W, 90), COLORS["panel_bg"], radius=0, alpha=0.75)
-
-        # Title
+        draw_rounded_rect(frame, (0, 0), (W, 40), COLORS["panel_bg"], radius=0, alpha=0.75)
         put_text_shadow(frame, "EthSL -> Amharic Translator",
-                        (10, 28), scale=0.75, color=COLORS["accent"],
-                        thickness=1)
-
-        # FPS
-        fps_color = COLORS["accent"] if fps >= 25 else COLORS["warning"]
-        put_text_shadow(frame, f"FPS: {fps:.0f}", (W - 110, 28),
-                        scale=0.65, color=fps_color, thickness=1)
-
-        # Speech indicator
-        speech_text  = "[SPEECH ON]" if speech_enabled else "[SPEECH OFF]"
+                        (10, 27), scale=0.7, color=COLORS["accent"], thickness=1)
+        fps_color = COLORS["accent"] if fps >= 15 else COLORS["warning"]
+        put_text_shadow(frame, f"FPS {fps:.0f}", (W - 75, 27),
+                        scale=0.55, color=fps_color, thickness=1)
+        speech_text  = "SPEECH ON" if speech_enabled else "SPEECH OFF"
         speech_color = COLORS["accent"] if speech_enabled else COLORS["gray"]
-        put_text_shadow(frame, speech_text, (W - 140, 55),
+        put_text_shadow(frame, speech_text, (W - 200, 27),
                         scale=0.5, color=speech_color, thickness=1)
 
-        # ── Buffer fill bar ────────────────────────────────────────────
-        bar_y  = 70
-        bar_x1, bar_x2 = 10, W - 10
-        bar_w  = bar_x2 - bar_x1
-        fill_w = int(bar_w * buffer_fill)
+        # ── Status bar: what the app is doing right now ────────────────
+        text, color = STATUS_TEXT[status]
+        if message:
+            text, color = message, COLORS["warning"]
+        draw_rounded_rect(frame, (0, 40), (W, 80), COLORS["bg_dark"], radius=0, alpha=0.7)
+        cv2.circle(frame, (20, 60), 8, color, -1, cv2.LINE_AA)
+        put_unicode_text(frame, text, (38, 68), size_px=22, color=color)
 
-        cv2.rectangle(frame, (bar_x1, bar_y), (bar_x2, bar_y + 12),
-                      COLORS["gray"], 1)
-        fill_color = COLORS["accent"] if buffer_fill < 0.9 else COLORS["warning"]
-        if fill_w > 0:
-            cv2.rectangle(frame, (bar_x1, bar_y), (bar_x1 + fill_w, bar_y + 12),
-                          fill_color, -1)
-        put_text_shadow(frame, "Buffer", (bar_x1, bar_y - 3),
-                        scale=0.4, color=COLORS["gray"], thickness=1)
-
-        # ── Current prediction panel ────────────────────────────────────
+        # ── Last recognised sign ───────────────────────────────────────
+        pred_y = H - 125
+        draw_rounded_rect(frame, (0, pred_y), (W, H), COLORS["panel_bg"], radius=0, alpha=0.80)
         if current_label:
-            pred_y = H - 150
-            draw_rounded_rect(frame, (0, pred_y), (W, H), COLORS["panel_bg"],
-                               radius=0, alpha=0.80)
-
-            # Sign label
-            put_text_shadow(frame, f"Sign: {current_label.replace('_', ' ').upper()}",
-                            (12, pred_y + 30), scale=0.8, color=COLORS["white"], thickness=2)
-
-            # Amharic text (Ethiopic script needs Pillow; cv2.putText shows "???")
-            put_unicode_text(frame, f"Amharic: {current_amharic}",
-                             (12, pred_y + 62), size_px=30, color=COLORS["accent2"])
+            put_unicode_text(frame, current_amharic, (12, pred_y + 48),
+                             size_px=44, color=COLORS["white"])
+            put_text_shadow(frame, current_label.replace("_", " "),
+                            (W - 190, pred_y + 40), scale=0.6, color=COLORS["gray"], thickness=1)
 
             # Confidence bar
-            conf_bar_x1, conf_bar_x2 = 12, W - 12
-            conf_bar_w = conf_bar_x2 - conf_bar_x1
-            conf_fill  = int(conf_bar_w * confidence)
             conf_color = (
                 COLORS["accent"]  if confidence >= 0.8 else
                 COLORS["warning"] if confidence >= 0.6 else
                 COLORS["danger"]
             )
-            cv2.rectangle(frame, (conf_bar_x1, pred_y + 75),
-                          (conf_bar_x2, pred_y + 88), COLORS["gray"], 1)
-            if conf_fill > 0:
-                cv2.rectangle(frame, (conf_bar_x1, pred_y + 75),
-                              (conf_bar_x1 + conf_fill, pred_y + 88), conf_color, -1)
-            put_text_shadow(frame, f"Confidence: {confidence*100:.1f}%",
-                            (12, pred_y + 105), scale=0.55, color=conf_color, thickness=1)
+            bar_x1, bar_x2, bar_y = 12, W - 130, pred_y + 62
+            cv2.rectangle(frame, (bar_x1, bar_y), (bar_x2, bar_y + 10), COLORS["gray"], 1)
+            fill = int((bar_x2 - bar_x1) * confidence)
+            if fill > 0:
+                cv2.rectangle(frame, (bar_x1, bar_y), (bar_x1 + fill, bar_y + 10), conf_color, -1)
+            put_text_shadow(frame, f"{confidence*100:.0f}% sure", (W - 120, bar_y + 10),
+                            scale=0.5, color=conf_color, thickness=1)
 
-            # Sentence history
             history_str = "  |  ".join(sentence_history) if sentence_history else "-"
             put_unicode_text(frame, f"History: {history_str}",
-                             (12, pred_y + 127), size_px=18, color=COLORS["gray"])
-
-        # ── Instructions ───────────────────────────────────────────────
+                             (12, pred_y + 98), size_px=18, color=COLORS["gray"])
         else:
-            # No prediction yet — show instructions at bottom
-            put_text_shadow(frame, "Perform a sign in front of the camera",
-                            (int(W * 0.15), H - 20), scale=0.6,
-                            color=COLORS["gray"], thickness=1)
+            put_text_shadow(frame, "Sign one word, then lower your hands.",
+                            (12, pred_y + 40), scale=0.6, color=COLORS["white"], thickness=1)
+            put_text_shadow(frame, "The word appears here.",
+                            (12, pred_y + 70), scale=0.55, color=COLORS["gray"], thickness=1)
 
-        # ── Keyboard hints (bottom-left) ───────────────────────────────
-        hints = "[Q] Quit  [R] Reset  [S] Speech  [C] Clear"
-        put_text_shadow(frame, hints, (10, H - 5),
-                        scale=0.4, color=COLORS["gray"], thickness=1)
+        # ── Keyboard hints ─────────────────────────────────────────────
+        put_text_shadow(frame, "[Q] Quit  [R] Reset  [S] Speech  [C] Clear history",
+                        (10, H - 6), scale=0.4, color=COLORS["gray"], thickness=1)
 
         return frame

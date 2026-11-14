@@ -22,3 +22,13 @@ h5py==3.11.0            # Keras .h5 model files
 joblib==1.4.2           # Dataset caching
 ipykernel==6.29.5       # Jupyter notebooks
 pytest==8.3.3           # Unit tests
+
+# Web page for adding training videos (app/contribute_app.py). Gradio 5.9 breaks
+# with newer pydantic/fastapi, and gTTS needs click < 8.2, so these are pinned.
+gradio==5.9.1
+fastapi==0.115.6
+starlette==0.41.3
+pydantic==2.10.4
+uvicorn==0.34.0
+huggingface-hub==0.27.1
+click==8.1.7

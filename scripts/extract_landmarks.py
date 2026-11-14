@@ -56,6 +56,19 @@ def process_clip(frames: np.ndarray, extractor: LandmarkExtractor) -> np.ndarray
     return np.array(keypoints, dtype=np.float32)
 
 
+def extract_clip(clip_path: Path, extractor: LandmarkExtractor) -> Path:
+    """Extract one clip's landmarks to <clip>_kp.npy (SEQUENCE_LENGTH frames) and return that path."""
+    frames = read_clip(clip_path)
+    if not frames:
+        raise ValueError(f"No frames in {clip_path}")
+    keypoints = SequenceBuilder.build_from_clip(
+        list(process_clip(frames, extractor)), target_length=SEQUENCE_LENGTH
+    )
+    kp_path = clip_path.with_name(clip_path.stem + "_kp.npy")
+    np.save(str(kp_path), keypoints)
+    return kp_path
+
+
 def main():
     parser = argparse.ArgumentParser(description="Extract MediaPipe landmarks from sign clips")
     parser.add_argument("--input_dir",    default=str(INPUT_DIR))
@@ -101,26 +114,11 @@ def main():
                 skipped += 1
                 continue
 
-            # Load raw frames
             try:
-                frames = read_clip(clip_path)
+                extract_clip(clip_path, extractor)
             except Exception as e:
-                print(f"\n  WARNING: Could not load {clip_path}: {e}")
+                print(f"\n  WARNING: Could not process {clip_path}: {e}")
                 continue
-            if not frames:
-                print(f"\n  WARNING: No frames in {clip_path} — skipped")
-                continue
-
-            # Extract landmarks
-            keypoints = process_clip(frames, extractor)  # (T, D)
-
-            # Resample to fixed length
-            keypoints = SequenceBuilder.build_from_clip(
-                list(keypoints), target_length=SEQUENCE_LENGTH
-            )
-
-            # Save
-            np.save(str(kp_path), keypoints)
             processed += 1
 
     print(f"\nDone.")

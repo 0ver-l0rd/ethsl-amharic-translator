@@ -6,11 +6,15 @@ Real-time EthSL sign language recognition application.
 Pipeline (per frame):
   1. Capture frame from webcam
   2. Extract MediaPipe Holistic landmarks
-  3. Add frame (with its capture time) to a rolling buffer
-  4. Once the buffer covers SIGN_WINDOW_SECONDS: resample that window to
-     30 frames (same time scale as the training clips) and run inference
-  5. Display top-1 prediction (Amharic text) with confidence
-  6. Synthesize Amharic speech for confirmed predictions
+  3. The sign spotter (src/sign_spotter.py) watches the hands: a sign starts
+     when they come up and ends when they have been down for a moment
+  4. After each sign: resample a SIGN_WINDOW_SECONDS window centred on it to
+     30 frames (cut the same way as the training clips) and classify it once
+  5. Display the sign (Amharic text) with its confidence, or "Not sure" if
+     the confidence is below the threshold
+  6. Synthesize Amharic speech for recognised signs
+
+Nothing is guessed while the hands are down.
 
 Usage:
   python app/realtime_app.py --model models/finetuned/best_model.h5
@@ -20,6 +24,7 @@ Keyboard controls:
   q     : Quit
   r     : Reset buffer (clear current sign window)
   s     : Toggle speech output on/off
+  c     : Clear the sentence history
 
 Authors: Emanuel Solomon, Menase Teshale
 """
@@ -44,15 +49,14 @@ except ImportError:
     sys.exit(1)
 
 from src.landmark_extractor import LandmarkExtractor, face_mode_for_dim
-from src.sequence_builder import SequenceBuilder
 from src.vocabulary import Vocabulary
 from src.amharic_tts import AmharicTTS
 from app.ui import SignLanguageUI
 from app.inference_engine import InferenceEngine
+from app.live_session import CONFIDENCE_THRESHOLD, LiveSession
 
 
 SEQUENCE_LENGTH     = 30
-CONFIDENCE_THRESHOLD = 0.65   # minimum confidence to accept a prediction
 VOCAB_PATH          = Path(__file__).parent.parent / "data" / "vocabulary.json"
 
 
@@ -109,15 +113,10 @@ def main():
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
                         help="Confidence threshold for accepting a prediction")
     parser.add_argument("--no_speech", action="store_true", help="Disable TTS output")
-    parser.add_argument("--infer_every", type=int, default=2,
-                        help="Run the classifier every N frames (1 = every frame). "
-                             "Higher values raise FPS; a sign lasts ~30 frames.")
     parser.add_argument("--lite", action="store_true",
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
                              "Best if training data was also extracted in lite mode.")
     args = parser.parse_args()
-    if args.infer_every < 1:
-        parser.error("--infer_every must be >= 1")
 
     print("EthSL Real-Time Translator")
     print("=" * 40)
@@ -125,7 +124,6 @@ def main():
     print(f"Camera:    {args.camera}")
     print(f"Threshold: {args.threshold}")
     print(f"Speech:    {'OFF' if args.no_speech else 'ON'}")
-    print(f"Classify:  every {args.infer_every} frame(s)")
     print(f"MediaPipe: {'lite' if args.lite else 'full'}")
 
     # Initialize components
@@ -142,7 +140,7 @@ def main():
     print(f"Face mode: {face_mode} ({feature_dim} features, from the model)")
     print()
 
-    seq_builder = SequenceBuilder(sequence_length=SEQUENCE_LENGTH, feature_dim=feature_dim)
+    session  = LiveSession(engine, args.threshold, SEQUENCE_LENGTH)
     tts      = AmharicTTS() if not args.no_speech else None
     ui       = SignLanguageUI(vocab)
     speech_enabled = not args.no_speech
@@ -161,16 +159,7 @@ def main():
     print("Press 'q' to quit | 'r' to reset | 's' to toggle speech")
     print()
 
-    # State
-    current_prediction  = None
-    current_amharic     = ""
-    current_confidence  = 0.0
-    sentence_history    = []
-    fps_counter         = deque(maxlen=30)
-    last_stable_pred    = None
-    stable_count        = 0
-    STABLE_THRESHOLD    = 3   # consecutive same predictions before accepting
-    frame_idx           = 0
+    fps_counter = deque(maxlen=30)
 
     with LandmarkExtractor(face_mode=face_mode,
                            model_complexity=0 if args.lite else 1) as extractor:
@@ -185,39 +174,16 @@ def main():
 
             # Extract landmarks
             keypoints, results = extractor.process_frame(frame)
-            seq_builder.add_frame(keypoints, timestamp=t_captured)
+            recognised = session.update(t_captured, keypoints)
 
             # Draw landmarks
             frame = extractor.draw_landmarks(frame, results)
 
-            # Run inference when buffer is ready (every infer_every frames)
-            frame_idx += 1
-            if seq_builder.is_ready() and frame_idx % args.infer_every == 0:
-                sequence = seq_builder.get_sequence()
-                pred_label, pred_amharic, confidence = engine.predict(sequence)
-
-                if pred_label is not None:
-                    # Stability check: require N consistent predictions
-                    if pred_label == last_stable_pred:
-                        stable_count += 1
-                    else:
-                        stable_count = 1
-                        last_stable_pred = pred_label
-
-                    if stable_count >= STABLE_THRESHOLD and confidence >= args.threshold:
-                        if current_prediction != pred_label:
-                            current_prediction = pred_label
-                            current_amharic    = pred_amharic
-                            current_confidence = confidence
-                            sentence_history.append(pred_amharic)
-
-                            # Speak the Amharic text
-                            if speech_enabled and tts:
-                                tts.speak(pred_amharic)
-
-                            # Reset buffer after confirmed prediction
-                            seq_builder.reset()
-                            stable_count = 0
+            if recognised:
+                print(f"{recognised}  ({session.label}, {session.confidence:.0%})")
+                if speech_enabled and tts:
+                    tts.reset()          # each sign is new, so say repeats too
+                    tts.speak(recognised)
 
             # FPS tracking
             fps_counter.append(time.perf_counter() - t0)
@@ -226,11 +192,12 @@ def main():
             # Draw UI overlay
             frame = ui.draw(
                 frame=frame,
-                current_label=current_prediction or "",
-                current_amharic=current_amharic,
-                confidence=current_confidence,
-                sentence_history=sentence_history[-5:],  # last 5 signs
-                buffer_fill=seq_builder.fill_ratio(),
+                status=session.status,
+                message=session.message,
+                current_label=session.label,
+                current_amharic=session.amharic,
+                confidence=session.confidence,
+                sentence_history=session.history[-5:],  # last 5 signs
                 fps=fps,
                 speech_enabled=speech_enabled,
             )
@@ -241,27 +208,22 @@ def main():
             if key == ord("q"):
                 break
             elif key == ord("r"):
-                seq_builder.reset()
-                current_prediction = None
-                current_amharic    = ""
-                current_confidence = 0.0
-                if tts:
-                    tts.reset()
-                print("Buffer reset.")
+                session.reset()
+                print("Reset.")
             elif key == ord("s"):
                 speech_enabled = not speech_enabled
                 print(f"Speech: {'ON' if speech_enabled else 'OFF'}")
             elif key == ord("c"):
-                sentence_history.clear()
+                session.clear_history()
                 print("Sentence history cleared.")
 
     reader.stop()
     cap.release()
     cv2.destroyAllWindows()
     print("\nSession ended.")
-    if sentence_history:
+    if session.history:
         print("Signs recognized this session:")
-        print(" | ".join(sentence_history))
+        print(" | ".join(session.history))
 
 
 if __name__ == "__main__":

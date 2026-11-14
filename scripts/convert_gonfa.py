@@ -126,7 +126,11 @@ def remove_old_outputs(label_dir: Path) -> int:
 
 
 def write_vocabulary(path: Path, words: list) -> None:
-    """Write vocabulary.json for `words`, grouped by category with contiguous IDs."""
+    """
+    Write vocabulary.json for `words`, grouped by category with contiguous IDs.
+    Signs already in the file that aren't Gonfa words (our own recordings,
+    added with src.vocabulary.add_word) are kept, after the Gonfa words.
+    """
     signs = defaultdict(list)
     for word in sorted(words, key=lambda w: list(WORDS).index(w)):
         category, label, english = WORDS[word]
@@ -135,6 +139,14 @@ def write_vocabulary(path: Path, words: list) -> None:
     for group in signs.values():
         for sign in group:
             sign["id"] = next_id
+            next_id += 1
+    gonfa_labels = {label for _, label, _ in WORDS.values()}
+    if path.exists():
+        old = json.loads(path.read_text(encoding="utf-8"))
+        ours = [(s["id"], category, s) for category, group in old["signs"].items()
+                for s in group if s["label"] not in gonfa_labels]
+        for _, category, s in sorted(ours, key=lambda x: x[0]):
+            signs[category].append({**s, "id": next_id})
             next_id += 1
     meta = {
         "version": "2.0",

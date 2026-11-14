@@ -23,7 +23,11 @@ import numpy as np
 # ships with every opencv-python build. The backend is named explicitly because
 # letting OpenCV try H.264 through FFmpeg first prints "[ERROR] Could not open
 # codec libopenh264" on every clip (harmless, but alarming while recording).
-_WRITERS = ([(cv2.CAP_MSMF, "avc1")] if sys.platform == "win32" else []) + [(cv2.CAP_FFMPEG, "mp4v")]
+# On macOS, FFmpeg's H.264 works quietly, and browsers can play it (they can't
+# play MPEG-4 Part 2), which the review page of app/web_app.py needs.
+_WRITERS = ([(cv2.CAP_MSMF, "avc1")] if sys.platform == "win32" else []) + \
+           ([(cv2.CAP_FFMPEG, "avc1")] if sys.platform == "darwin" else []) + \
+           [(cv2.CAP_FFMPEG, "mp4v")]
 
 
 def open_clip_writer(path: Path, fps: float, size: Tuple[int, int]) -> Tuple[cv2.VideoWriter, str]:

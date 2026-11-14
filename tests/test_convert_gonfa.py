@@ -106,3 +106,13 @@ def test_vocabulary_lists_only_words_with_data(fake_download, tmp_path, monkeypa
     assert sorted(vocab.get_all_labels()) == ["hazen", "lemin"]
     assert vocab.label_to_amharic("lemin") == "ለምን"
     assert json.loads(path.read_text(encoding="utf-8"))["metadata"]["total_signs"] == 2
+
+
+def test_rerun_keeps_our_own_words_after_the_gonfa_ones(fake_download, tmp_path, monkeypatch):
+    from src.vocabulary import add_word
+    _, path = convert(fake_download, tmp_path, monkeypatch)
+    add_word(path, "selam", "ሰላም", "Hello")
+    _, path = convert(fake_download, tmp_path, monkeypatch)
+    vocab = Vocabulary(str(path))
+    assert vocab.num_classes == 3
+    assert vocab.label_to_id("selam") == 2           # after the 2 Gonfa words

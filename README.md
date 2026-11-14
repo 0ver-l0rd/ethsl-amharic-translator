@@ -94,6 +94,8 @@ ethsl-amharic-translator/
 |
 |-- app/
 |   |-- realtime_app.py         # Main real-time inference application
+|   |-- web_app.py              # Browser version: translate, add videos, review, retrain
+|   |-- live_session.py         # Per-sign recognition shared by both apps
 |   |-- ui.py                   # OpenCV-based display overlay
 |   `-- inference_engine.py     # Optimized inference pipeline
 |
@@ -180,6 +182,20 @@ python scripts/split_recording.py s01_01.mp4 --label selam --dry_run --plot
 python scripts/split_recording.py s01_01.mp4 --label selam   # then extract_landmarks.py as above
 ```
 
+**Adding videos from a web page.** `web_app.py` (see step 6) does the same
+splitting in a browser, for any number of repetitions, so anyone can add a
+word or more examples of one:
+
+- **Add a video:** pick the word (or type a new one in Amharic), upload or
+  record the video, and submit. It is split into one clip per repetition.
+- **Review** (team): watch the clips, untick bad ones, approve or reject.
+  Only approved clips reach `data/landmarks/`; rejected ones are deleted.
+- **Retrain** (team): trains a new model into `models/candidate/` and shows its
+  scores next to the current one; **Use this model** makes the live app use it.
+
+Contributors are stored as `c01`, `c02`, ...; the table of their names stays
+in `data/contributions/`, which is never committed.
+
 **Gonfa et al. dataset.** The isolated-word EthSL dataset of Gonfa et al.,
 *Scientific Reports* 15:36181 (2025), is 7 signers x 40 clips per word, already
 as MediaPipe landmarks. It was shared with us for non-commercial use on
@@ -226,8 +242,15 @@ python finetune.py --config config.yaml --pretrained ../models/refined/best_mode
 
 ### 6. Run the real-time app
 ```bash
-python app/realtime_app.py --model models/finetuned/best_model.h5
+python app/realtime_app.py --model models/finetuned/best_model.h5   # desktop window
+python app/web_app.py            # in the browser: open http://127.0.0.1:7860
+python app/web_app.py --public   # Translate and Add a video only (for hosting)
 ```
+
+Both guess once per sign: a sign starts when the hands come up and ends when
+they are lowered, and below 65% confidence the app says "Not sure" instead of
+guessing. The browser version also has tabs for adding training videos,
+reviewing them, and retraining.
 
 ---
 

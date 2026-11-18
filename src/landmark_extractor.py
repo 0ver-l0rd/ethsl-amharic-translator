@@ -96,7 +96,9 @@ class LandmarkExtractor:
         min_detection_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
         model_complexity: int = 1,
+        static_image_mode: bool = False,
     ):
+        """static_image_mode: treat frames as unrelated photos (no tracking between them)."""
         if face_mode not in FACE_MODES:
             raise ValueError(f"face_mode must be one of {FACE_MODES}, got {face_mode!r}")
         self.face_mode = face_mode
@@ -107,6 +109,7 @@ class LandmarkExtractor:
         self.mp_drawing_styles = mp.solutions.drawing_styles
 
         self.holistic = self.mp_holistic.Holistic(
+            static_image_mode=static_image_mode,
             model_complexity=model_complexity,
             min_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,

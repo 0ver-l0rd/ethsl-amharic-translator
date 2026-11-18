@@ -7,8 +7,9 @@ classifies once per sign instead of guessing on every frame.
 A sign is a stretch where a hand is tracked and a wrist is clearly above its
 resting height, the same test split_recording.py uses to cut the training
 clips. When the hands have been down for MIN_REST, the sign is over; the
-classifier gets a SIGN_WINDOW_SECONDS window centred on it, which is how the
-training clips are cut too.
+classifier gets a window centred on it, SIGN_WINDOW_SECONDS long or longer for
+a slow sign (sequence_builder.sign_window), which is how the training clips
+are cut too.
 
 No MediaPipe or TensorFlow import, so it can be tested on its own.
 
@@ -22,7 +23,7 @@ from typing import NamedTuple, Optional, Tuple
 import numpy as np
 
 from src.landmark_layout import LEFT_SHOULDER, POSE_DIMS, RIGHT_SHOULDER
-from src.sequence_builder import SEQUENCE_LENGTH, SIGN_WINDOW_SECONDS, resample_window
+from src.sequence_builder import MAX_CLIP_SECONDS, SEQUENCE_LENGTH, SIGN_WINDOW_SECONDS, resample_window, sign_window
 
 LEFT_WRIST, RIGHT_WRIST = 15, 16
 HAND_DIMS = 63
@@ -124,7 +125,7 @@ class SignSpotter:
     def add_frame(self, t: float, keypoints: np.ndarray) -> Optional[Event]:
         self._now = t
         self._frames.append((t, keypoints))
-        keep = self.window_seconds + MAX_SIGN + 1.0
+        keep = max(self.window_seconds, MAX_CLIP_SECONDS) + MAX_SIGN + 1.0
         while self._frames and self._frames[0][0] < t - keep:
             self._frames.popleft()
 
@@ -151,8 +152,9 @@ class SignSpotter:
         elif self._sign_start is not None and t - self._last_active >= MIN_REST:
             start, end = self._sign_start, self._last_active
             if not self._too_long and end - start >= MIN_SIGN:
-                lo = (start + end) / 2 - self.window_seconds / 2
-                self._pending = (lo, lo + self.window_seconds)
+                length = sign_window(start, end, self.window_seconds)
+                lo = (start + end) / 2 - length / 2
+                self._pending = (lo, lo + length)
             self._sign_start, self._too_long = None, False
         return event
 

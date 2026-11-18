@@ -58,6 +58,7 @@ ethsl-amharic-translator/
 |-- scripts/
 |   |-- collect_data.py         # Record sign clips via webcam
 |   |-- split_recording.py      # Split a phone video of repeated signs into clips
+|   |-- split_batch.py          # Split a whole folder of phone videos
 |   |-- extract_landmarks.py    # MediaPipe Holistic extraction pipeline
 |   |-- preprocess.py           # Normalize + build fixed-length sequences
 |   |-- split_dataset.py        # Create signer-dependent/independent splits
@@ -174,12 +175,27 @@ python scripts/split_dataset.py                    # --holdout_signer s04 to pic
 a phone as one landscape video of 15 repetitions, with the hands fully down for
 about a second between them, named `<signer>_<word>.mp4` (e.g. `s01_01.mp4`).
 `split_recording.py` finds the repetitions from the hand landmarks and saves a
-2.5 s clip around each one, in the same place `collect_data.py` would. It
-writes nothing unless it finds the expected count, so dry-run it first:
+clip around each one, in the same place `collect_data.py` would. Clips are
+2.5 s, or longer for a slow sign (the whole sign plus 0.25 s each side, up to
+4.5 s); the live app cuts the same window around each sign it sees. Videos
+filmed sideways or upside down are turned upright. Reps cut off by the start
+or end of the recording, the reach for the phone at the end, and two reps run
+together are left out. It writes nothing unless it finds the expected count,
+so dry-run it first:
 
 ```bash
 python scripts/split_recording.py s01_01.mp4 --label selam --dry_run --plot
 python scripts/split_recording.py s01_01.mp4 --label selam   # then extract_landmarks.py as above
+```
+
+A whole folder of videos named `<signer>_<number>` (numbers from
+`data/our_words.tsv`) is split in one go, with one summary table, and its
+landmarks extracted. Signers who do more than 15 reps are fine with `--extra`;
+bad reps found on review go in the folder's `skip.txt` (e.g. `s02_15  22`).
+
+```bash
+python scripts/split_batch.py "~/Desktop/Senior Project/recordings/s02" --extra 15 --dry_run
+python scripts/split_batch.py "~/Desktop/Senior Project/recordings/s02" --extra 15
 ```
 
 **Adding videos from a web page.** `web_app.py` (see step 6) does the same
@@ -285,20 +301,22 @@ See `module2_finetune/README.md` for full details.
 
 ## Vocabulary
 
-The system targets **50-100 common EthSL signs**. `data/vocabulary.json` is
-currently written by `scripts/convert_gonfa.py` (15 words from the Gonfa et al.
-dataset); the planned everyday words are:
+The system targets **50-100 common EthSL signs**. `data/vocabulary.json` has
+71 words: the 15 from the Gonfa et al. dataset (written first by
+`scripts/convert_gonfa.py`, which keeps the words after them), then the team's
+own recordings. The team records the 65 words in `data/our_words.tsv`: 60
+everyday words and 5 that are also in the Gonfa data:
 
 | Category | Examples (Amharic) |
 |---|---|
-| Greetings | selam, dehna neh, dehna nesh, dehna hun |
-| Common questions | simih man new?, min felegh?, wagaw sint new? |
-| Basic responses | awo, ay, algebagn, silezih |
-| Daily life | wiha, migib, hospital, timhirt bet, bet |
-| Numbers (1-10) | and, hulet, sost...asr |
-| Emergency | irdeta, himem, police |
+| Greetings | ሰላም, እንዴት, ደህና, ደህና ሰንብት |
+| Questions | ምን, የት, መቼ, ስንት, ስም |
+| Responses | አዎ, አይደለም, እሺ, ጥሩ |
+| Daily life | ውሃ, ምግብ, መድሃኒት, ገንዘብ, ሆስፒታል, ቤት, ትምህርት ቤት |
+| Actions | መርዳት, መፈለግ, መብላት, መጠጣት, መሄድ, መምጣት |
+| Time, people, things | ዛሬ, ነገ, ቀን, ልጅ, ተማሪ, ቡና, እንጀራ, መኪና |
 
-The full mapping is in `data/vocabulary.json`.
+A word is added to `data/vocabulary.json` once it has recorded clips.
 
 ---
 

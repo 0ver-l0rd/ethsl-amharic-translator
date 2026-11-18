@@ -27,6 +27,8 @@ from src.landmark_layout import body_relative
 SEQUENCE_LENGTH     = 30   # frames per sign sequence fed to the model
 SIGN_WINDOW_SECONDS = 2.5  # real time covered by one sign sequence; holds 91% of the
                            # AAU dictionary signs (1.5 s held only 34%)
+SIGN_PAD            = 0.25 # s kept before and after a sign that is longer than the window
+MAX_CLIP_SECONDS    = 4.5  # longest window cut around one sign
 MIN_WINDOW_FRAMES   = 8    # fewer real frames than this per window is too sparse to classify
 FEATURE_DIM = 258          # default: pose(132) + lh(63) + rh(63)
 
@@ -47,6 +49,16 @@ def _resample(times: np.ndarray, frames: np.ndarray, targets: np.ndarray) -> np.
     blended = a * (1.0 - w) + b * w
     nearest = np.where(w < 0.5, a, b)
     return np.where((a != 0) & (b != 0), blended, nearest).astype(np.float32)
+
+
+def sign_window(start: float, end: float, minimum: float = SIGN_WINDOW_SECONDS) -> float:
+    """
+    Seconds to cut around a sign from `start` to `end` (hands up to hands down):
+    at least `minimum`, and long enough to hold a slow sign with SIGN_PAD on
+    each side (up to MAX_CLIP_SECONDS). The splitter cuts training clips and
+    the live app cuts its windows with this, so both see signs the same way.
+    """
+    return min(max(minimum, end - start + 2 * SIGN_PAD), max(minimum, MAX_CLIP_SECONDS))
 
 
 def resample_window(times: np.ndarray, frames: np.ndarray, start: float, end: float,

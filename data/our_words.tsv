@@ -1,0 +1,69 @@
+# The words the team records (practice pack word_list.txt), with the folder
+# label each one is saved under. Video names are <signer>_<number>, e.g.
+# s03_07.mp4 is አዎ. E1-E5 are also in the Gonfa dataset and use its labels.
+# number	label	amharic	english
+01	selam	ሰላም	hello
+02	endet	እንዴት	how
+03	ante	አንተ	you
+04	dehna	ደህና	fine
+05	ene	እኔ	I
+06	dehna_senbet	ደህና ሰንብት	goodbye
+07	awo	አዎ	yes
+08	aydelem	አይደለም	no
+09	eshi	እሺ	okay
+10	tiru	ጥሩ	good
+11	min	ምን	what
+12	yet	የት	where
+13	mechie	መቼ	when
+14	sint	ስንት	how many
+15	sim	ስም	name
+16	wuha	ውሃ	water
+17	migib	ምግብ	food
+18	medhanit	መድሃኒት	medicine
+19	genzeb	ገንዘብ	money
+20	merdat	መርዳት	help
+21	mefeleg	መፈለግ	want
+22	meblat	መብላት	eat
+23	metetat	መጠጣት	drink
+24	mehed	መሄድ	go
+25	memtat	መምጣት	come
+26	metebek	መጠበቅ	wait
+27	mawek	ማወቅ	know
+28	hospital	ሆስፒታል	hospital
+29	bet	ቤት	house
+30	timhirt_bet	ትምህርት ቤት	school
+31	gebeya	ገበያ	market
+32	menged	መንገድ	road
+33	zare	ዛሬ	today
+34	nege	ነገ	tomorrow
+35	tinant	ትናንት	yesterday
+36	ken	ቀን	day
+37	gize	ጊዜ	time
+38	enat	እናት	mother
+39	abat	አባት	father
+40	lij	ልጅ	child
+41	set	ሴት	woman
+42	wend	ወንድ	man
+43	guadegna	ጓደኛ	friend
+44	beteseb	ቤተሰብ	family
+45	astemari	አስተማሪ	teacher
+46	temari	ተማሪ	student
+47	memar	መማር	learn
+48	mestet	መስጠት	give
+49	megzat	መግዛት	buy
+50	metegnat	መተኛት	sleep
+51	mekemet	መቀመጥ	sit
+52	dabo	ዳቦ	bread
+53	buna	ቡና	coffee
+54	enjera	እንጀራ	injera
+55	silk	ስልክ	phone
+56	mekina	መኪና	car
+57	tilik	ትልቅ	big
+58	addis	አዲስ	new
+59	samint	ሳምንት	week
+60	amet	ዓመት	year
+E1	misgana	ምስጋና	thanks
+E2	lemin	ለምን	why
+E3	mejemer	መጀመር	start
+E4	mecheres	መጨረስ	finish
+E5	tenes	ተነስ	stand up

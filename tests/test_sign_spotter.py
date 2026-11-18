@@ -97,3 +97,13 @@ def test_reset_drops_the_sign_in_progress():
         if e:
             kinds.append(e.kind)
     assert kinds == []
+
+
+def test_slow_sign_gets_a_longer_window_with_rest_on_both_sides():
+    _, events, _ = run([(2.0, 5.2)])                # 3.2 s, longer than SIGN_WINDOW_SECONDS
+    assert len(events) == 1
+    # window = 3.2 + 2 x 0.25 = 3.7 s (3.6 +- 1.85); it is already complete when the
+    # sign is found to be over (hands down for MIN_REST), so the guess comes then
+    assert 5.2 + 0.3 < events[0][0] < 5.2 + 0.5
+    hand = np.abs(events[0][1].sequence[:, 132 + 63:]).sum(1) > 0
+    assert not hand[0] and not hand[-1]             # the whole sign is inside

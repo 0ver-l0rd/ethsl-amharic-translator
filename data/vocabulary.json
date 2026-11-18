@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "2.0",
-    "total_signs": 15,
+    "total_signs": 71,
     "language": "Ethiopian Sign Language (EthSL)",
     "output_language": "Amharic",
     "reference": "Gonfa et al., Scientific Reports 15:36181 (2025)",
@@ -10,7 +10,8 @@
       "questions",
       "actions",
       "social",
-      "descriptive"
+      "descriptive",
+      "everyday"
     ]
   },
   "signs": {
@@ -112,6 +113,344 @@
         "amharic": "ቀላል",
         "description": "Easy",
         "id": 14
+      }
+    ],
+    "everyday": [
+      {
+        "label": "selam",
+        "amharic": "ሰላም",
+        "description": "hello",
+        "id": 15
+      },
+      {
+        "label": "endet",
+        "amharic": "እንዴት",
+        "description": "how",
+        "id": 16
+      },
+      {
+        "label": "ante",
+        "amharic": "አንተ",
+        "description": "you",
+        "id": 17
+      },
+      {
+        "label": "dehna",
+        "amharic": "ደህና",
+        "description": "fine",
+        "id": 18
+      },
+      {
+        "label": "ene",
+        "amharic": "እኔ",
+        "description": "I",
+        "id": 19
+      },
+      {
+        "label": "dehna_senbet",
+        "amharic": "ደህና ሰንብት",
+        "description": "goodbye",
+        "id": 20
+      },
+      {
+        "label": "awo",
+        "amharic": "አዎ",
+        "description": "yes",
+        "id": 21
+      },
+      {
+        "label": "aydelem",
+        "amharic": "አይደለም",
+        "description": "no",
+        "id": 22
+      },
+      {
+        "label": "eshi",
+        "amharic": "እሺ",
+        "description": "okay",
+        "id": 23
+      },
+      {
+        "label": "tiru",
+        "amharic": "ጥሩ",
+        "description": "good",
+        "id": 24
+      },
+      {
+        "label": "min",
+        "amharic": "ምን",
+        "description": "what",
+        "id": 25
+      },
+      {
+        "label": "yet",
+        "amharic": "የት",
+        "description": "where",
+        "id": 26
+      },
+      {
+        "label": "mechie",
+        "amharic": "መቼ",
+        "description": "when",
+        "id": 27
+      },
+      {
+        "label": "sint",
+        "amharic": "ስንት",
+        "description": "how many",
+        "id": 28
+      },
+      {
+        "label": "sim",
+        "amharic": "ስም",
+        "description": "name",
+        "id": 29
+      },
+      {
+        "label": "wuha",
+        "amharic": "ውሃ",
+        "description": "water",
+        "id": 30
+      },
+      {
+        "label": "migib",
+        "amharic": "ምግብ",
+        "description": "food",
+        "id": 31
+      },
+      {
+        "label": "medhanit",
+        "amharic": "መድሃኒት",
+        "description": "medicine",
+        "id": 32
+      },
+      {
+        "label": "genzeb",
+        "amharic": "ገንዘብ",
+        "description": "money",
+        "id": 33
+      },
+      {
+        "label": "merdat",
+        "amharic": "መርዳት",
+        "description": "help",
+        "id": 34
+      },
+      {
+        "label": "mefeleg",
+        "amharic": "መፈለግ",
+        "description": "want",
+        "id": 35
+      },
+      {
+        "label": "meblat",
+        "amharic": "መብላት",
+        "description": "eat",
+        "id": 36
+      },
+      {
+        "label": "metetat",
+        "amharic": "መጠጣት",
+        "description": "drink",
+        "id": 37
+      },
+      {
+        "label": "mehed",
+        "amharic": "መሄድ",
+        "description": "go",
+        "id": 38
+      },
+      {
+        "label": "memtat",
+        "amharic": "መምጣት",
+        "description": "come",
+        "id": 39
+      },
+      {
+        "label": "metebek",
+        "amharic": "መጠበቅ",
+        "description": "wait",
+        "id": 40
+      },
+      {
+        "label": "mawek",
+        "amharic": "ማወቅ",
+        "description": "know",
+        "id": 41
+      },
+      {
+        "label": "hospital",
+        "amharic": "ሆስፒታል",
+        "description": "hospital",
+        "id": 42
+      },
+      {
+        "label": "bet",
+        "amharic": "ቤት",
+        "description": "house",
+        "id": 43
+      },
+      {
+        "label": "timhirt_bet",
+        "amharic": "ትምህርት ቤት",
+        "description": "school",
+        "id": 44
+      },
+      {
+        "label": "gebeya",
+        "amharic": "ገበያ",
+        "description": "market",
+        "id": 45
+      },
+      {
+        "label": "menged",
+        "amharic": "መንገድ",
+        "description": "road",
+        "id": 46
+      },
+      {
+        "label": "zare",
+        "amharic": "ዛሬ",
+        "description": "today",
+        "id": 47
+      },
+      {
+        "label": "nege",
+        "amharic": "ነገ",
+        "description": "tomorrow",
+        "id": 48
+      },
+      {
+        "label": "tinant",
+        "amharic": "ትናንት",
+        "description": "yesterday",
+        "id": 49
+      },
+      {
+        "label": "ken",
+        "amharic": "ቀን",
+        "description": "day",
+        "id": 50
+      },
+      {
+        "label": "gize",
+        "amharic": "ጊዜ",
+        "description": "time",
+        "id": 51
+      },
+      {
+        "label": "lij",
+        "amharic": "ልጅ",
+        "description": "child",
+        "id": 52
+      },
+      {
+        "label": "set",
+        "amharic": "ሴት",
+        "description": "woman",
+        "id": 53
+      },
+      {
+        "label": "wend",
+        "amharic": "ወንድ",
+        "description": "man",
+        "id": 54
+      },
+      {
+        "label": "beteseb",
+        "amharic": "ቤተሰብ",
+        "description": "family",
+        "id": 55
+      },
+      {
+        "label": "astemari",
+        "amharic": "አስተማሪ",
+        "description": "teacher",
+        "id": 56
+      },
+      {
+        "label": "temari",
+        "amharic": "ተማሪ",
+        "description": "student",
+        "id": 57
+      },
+      {
+        "label": "memar",
+        "amharic": "መማር",
+        "description": "learn",
+        "id": 58
+      },
+      {
+        "label": "mestet",
+        "amharic": "መስጠት",
+        "description": "give",
+        "id": 59
+      },
+      {
+        "label": "metegnat",
+        "amharic": "መተኛት",
+        "description": "sleep",
+        "id": 60
+      },
+      {
+        "label": "mekemet",
+        "amharic": "መቀመጥ",
+        "description": "sit",
+        "id": 61
+      },
+      {
+        "label": "dabo",
+        "amharic": "ዳቦ",
+        "description": "bread",
+        "id": 62
+      },
+      {
+        "label": "buna",
+        "amharic": "ቡና",
+        "description": "coffee",
+        "id": 63
+      },
+      {
+        "label": "enjera",
+        "amharic": "እንጀራ",
+        "description": "injera",
+        "id": 64
+      },
+      {
+        "label": "silk",
+        "amharic": "ስልክ",
+        "description": "phone",
+        "id": 65
+      },
+      {
+        "label": "mekina",
+        "amharic": "መኪና",
+        "description": "car",
+        "id": 66
+      },
+      {
+        "label": "tilik",
+        "amharic": "ትልቅ",
+        "description": "big",
+        "id": 67
+      },
+      {
+        "label": "addis",
+        "amharic": "አዲስ",
+        "description": "new",
+        "id": 68
+      },
+      {
+        "label": "samint",
+        "amharic": "ሳምንት",
+        "description": "week",
+        "id": 69
+      },
+      {
+        "label": "amet",
+        "amharic": "ዓመት",
+        "description": "year",
+        "id": 70
       }
     ]
   }

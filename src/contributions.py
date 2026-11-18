@@ -149,7 +149,10 @@ def split_upload(video: Path, label: str, amharic: str, description: str, new_wo
     import split_recording as sr
 
     signer = signer_id_for(contributor, root, team)
-    analyse = analyse or sr.analyse
+    rotation = 0
+    if analyse is None:                  # real video: turn it upright if it was saved sideways
+        rotation = sr.detect_rotation(Path(video))
+        analyse = lambda v: sr.analyse(v, rotation=rotation)
     times, keypoints, _, duration = analyse(Path(video))
     _, hand, _ = sr.activity_signal(keypoints)
 
@@ -161,10 +164,13 @@ def split_upload(video: Path, label: str, amharic: str, description: str, new_wo
         inside = (times >= start) & (times <= end)
         upload.reps.append(Rep(start, end, lo, hi, float(hand[inside].mean()) if inside.any() else 0.0,
                                f"rep_{n:02d}.mp4"))
+    upload.reps = [r for r in upload.reps if not sr.cut_by_recording(r.start, r.end, duration)]
+    if upload.reps and sr.is_stop_reach(upload.reps[-1].start, upload.reps[-1].end, upload.reps[-1].hand_tracked, duration):
+        upload.reps.pop()                # reaching for the phone to stop recording
     _save(upload, root)
     if upload.reps:
         sr.write_clips(Path(video), [(r.clip_start, r.clip_end) for r in upload.reps],
-                       upload.clip_paths(root))
+                       upload.clip_paths(root), rotation=rotation)
     return upload
 
 

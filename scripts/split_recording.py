@@ -7,14 +7,16 @@ repetition, ready for extract_landmarks.py.
 The signer rests with their hands fully down for about a second between
 repetitions. MediaPipe tracks the wrists on every frame; a repetition is a
 stretch where a hand is tracked or a wrist is clearly above its resting
-height. Each repetition is saved as a SIGN_WINDOW_SECONDS clip centred on
+height. Each repetition is saved as a clip centred on it, SIGN_WINDOW_SECONDS
+long or longer for a slow sign (sequence_builder.sign_window), centred on
 it, the same length collect_data.py records, so training clips and the live
 app's window cover the same amount of time.
 
 Input:  a video named <signer>_<word>.mp4 / .mov, e.g. s01_01.mp4, s02_E1.mov
 Output: data/landmarks/<label>/<signer>_seq_XXX.mp4  (one per repetition)
 
-Nothing is written unless exactly --expected repetitions are found (use
+Nothing is written unless exactly --expected repetitions are found (or up
+to --extra more, for signers who do a spare one or two; use
 --force to write anyway). Check the printed table, and the --plot image if
 the count is off.
 
@@ -40,7 +42,8 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import clip_filename, next_clip_index, parse_signer, validate_signer_id
-from src.sequence_builder import SIGN_WINDOW_SECONDS
+from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER
+from src.sequence_builder import SIGN_WINDOW_SECONDS, sign_window
 from src.sign_spotter import activity_signal   # shared with the live app
 from src.video_io import open_clip_writer
 
@@ -53,6 +56,17 @@ MAX_HEIGHT    = 720    # saved clips are scaled down to this height (MediaPipe n
 RAISED_MARGIN = 0.5    # shoulder widths above resting wrist height that count as "hands up"
 MIN_REST      = 0.3    # s; shorter gaps are a hand dipping mid-sign, not a rest
 MIN_SIGN      = 0.4    # s; shorter bursts are a twitch, not a sign
+HAND_REST_MARGIN = 0.3   # shoulder widths; a tracked hand lower than rest + this is resting
+MERGED_FACTOR = 2.0       # a rep this many times the median sign length is two reps run together
+HANDS_ALWAYS_SEEN = 0.85  # hands tracked in more frames than this: they rest in view, so
+                          # "hand tracked" can't mark a sign and only wrist height is used
+# A short last "repetition" just before the end of the video, with the hands
+# poorly tracked, is the signer reaching for the phone to stop recording. (A
+# long one is a real sign that ran into the reach, so it is kept.)
+STOP_REACH_END   = 1.0  # s from the end of the video
+STOP_REACH_HANDS = 0.5  # below this share of frames with a hand detected
+STOP_REACH_LEN   = 2.5  # s; longer stretches hold a real sign
+EDGE_TOLERANCE   = 0.05 # s; a rep this close to the start or end of the video was cut off
 
 _NAME_RE = re.compile(r"^(?P<signer>[A-Za-z0-9-]+)_(?P<word>[A-Za-z0-9-]+)$")
 
@@ -98,7 +112,14 @@ def find_repetitions(
     if not pose_ok.any():
         return []
     rest = np.percentile(height[pose_ok], 10)     # signers rest more than 10% of the time
-    active = pose_ok & (hand | (height > rest + raised_margin))
+    raised = height > rest + raised_margin
+    # A tracked hand counts as signing too (for signs made low), but not when
+    # it is at resting height: some signers rest with their hands in view.
+    off_rest = height > rest + HAND_REST_MARGIN
+    if hand[pose_ok].mean() > HANDS_ALWAYS_SEEN:
+        active = pose_ok & raised                 # hands always in view (e.g. in the lap): height only
+    else:
+        active = pose_ok & ((hand & off_rest) | raised)
 
     # Runs of active frames, as index ranges [a, b]
     edges = np.diff(np.concatenate([[0], active.astype(int), [0]]))
@@ -113,15 +134,71 @@ def find_repetitions(
     return [(float(times[a]), float(times[b])) for a, b in merged if times[b] - times[a] >= min_sign]
 
 
+def cut_by_recording(start: float, end: float, video_duration: float) -> bool:
+    """True for a rep already going when the recording started or still going when it
+    stopped: part of the sign is missing."""
+    return start <= EDGE_TOLERANCE or video_duration - end <= EDGE_TOLERANCE
+
+
+def is_stop_reach(start: float, end: float, hand_tracked: float, video_duration: float) -> bool:
+    """True for the signer reaching for the phone at the end of the video (not a sign)."""
+    return (video_duration - end <= STOP_REACH_END and hand_tracked < STOP_REACH_HANDS
+            and end - start < STOP_REACH_LEN)
+
+
 def clip_window(start: float, end: float, length: float, video_duration: float) -> Tuple[float, float]:
-    """A window of the given length centred on [start, end], kept inside the video."""
-    length = min(length, video_duration)
+    """(start, end) of the clip around a sign: at least `length` seconds, longer for a
+    slow sign (sign_window), centred on the sign and kept inside the video."""
+    length = min(sign_window(start, end, length), video_duration)
     lo = min(max((start + end) / 2 - length / 2, 0.0), video_duration - length)
     return lo, lo + length
 
 
-def analyse(video: Path, fps: float = ANALYSIS_FPS) -> Tuple[np.ndarray, np.ndarray, float, float]:
-    """Run MediaPipe on the video at about `fps`. Returns (times, keypoints, source_fps, duration)."""
+# Degrees to turn a frame clockwise to make it upright. Phones sometimes save a
+# landscape recording sideways with no rotation tag (e.g. after Telegram).
+ROTATIONS = {0: None, 90: cv2.ROTATE_90_CLOCKWISE, 180: cv2.ROTATE_180,
+             270: cv2.ROTATE_90_COUNTERCLOCKWISE}
+NOSE = 0
+
+
+def rotate(frame: np.ndarray, degrees: int) -> np.ndarray:
+    return frame if not degrees else cv2.rotate(frame, ROTATIONS[degrees])
+
+
+def is_upright(keypoints: np.ndarray) -> np.ndarray:
+    """Per frame: a body was found with the nose above level shoulders."""
+    pose = keypoints[:, :33 * 4].reshape(-1, 33, 4)
+    ls, rs, nose = pose[:, LEFT_SHOULDER, :2], pose[:, RIGHT_SHOULDER, :2], pose[:, NOSE, :2]
+    width = np.linalg.norm(ls - rs, axis=1)
+    mid = (ls + rs) / 2
+    return (width > 1e-6) & (np.abs(ls[:, 1] - rs[:, 1]) < 0.5 * width) & (mid[:, 1] - nose[:, 1] > 0.3 * width)
+
+
+def detect_rotation(video: Path, samples: int = 10) -> int:
+    """The rotation (0/90/180/270) that shows the signer upright in most sampled frames."""
+    from src.landmark_extractor import LandmarkExtractor
+
+    cap = cv2.VideoCapture(str(video))
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
+    frames = []
+    for k in range(samples):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int((k + 0.5) * n / samples))
+        ok, frame = cap.read()
+        if ok:
+            frames.append(frame)
+    cap.release()
+    scores = {}
+    for degrees in ROTATIONS:
+        with LandmarkExtractor(face_mode="none", static_image_mode=True) as extractor:
+            kps = np.array([extractor.process_frame(rotate(f, degrees))[0] for f in frames])
+        scores[degrees] = int(is_upright(kps).sum()) if len(kps) else 0
+    best = max(scores.values())
+    return 0 if scores[0] == best else max(scores, key=scores.get)
+
+
+def analyse(video: Path, fps: float = ANALYSIS_FPS, rotation: int = 0) -> Tuple[np.ndarray, np.ndarray, float, float]:
+    """Run MediaPipe on the video at about `fps`, turning frames by `rotation` degrees
+    clockwise first. Returns (times, keypoints, source_fps, duration)."""
     from src.landmark_extractor import LandmarkExtractor   # slow import; keep --help fast
 
     cap = cv2.VideoCapture(str(video))
@@ -136,7 +213,7 @@ def analyse(video: Path, fps: float = ANALYSIS_FPS) -> Tuple[np.ndarray, np.ndar
             if i % step == 0:
                 ok, frame = cap.retrieve()
                 if ok:
-                    kp, _ = extractor.process_frame(frame)
+                    kp, _ = extractor.process_frame(rotate(frame, rotation))
                     times.append(i / src_fps)
                     kps.append(kp)
             i += 1
@@ -147,8 +224,9 @@ def analyse(video: Path, fps: float = ANALYSIS_FPS) -> Tuple[np.ndarray, np.ndar
 
 
 def write_clips(video: Path, windows: List[Tuple[float, float]], paths: List[Path],
-                out_fps: float = OUTPUT_FPS, max_height: int = MAX_HEIGHT) -> None:
-    """Copy each [start, end) window of the video to its path, in one pass."""
+                out_fps: float = OUTPUT_FPS, max_height: int = MAX_HEIGHT, rotation: int = 0) -> None:
+    """Copy each [start, end) window of the video to its path, in one pass, turned
+    `rotation` degrees clockwise."""
     cap = cv2.VideoCapture(str(video))
     src_fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(1, round(src_fps / out_fps))
@@ -167,6 +245,7 @@ def write_clips(video: Path, windows: List[Tuple[float, float]], paths: List[Pat
         ok, frame = cap.retrieve()
         if not ok:
             break
+        frame = rotate(frame, rotation)
         h, w = frame.shape[:2]
         if h > max_height:
             frame = cv2.resize(frame, (round(w * max_height / h), max_height), interpolation=cv2.INTER_AREA)
@@ -220,7 +299,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--window", type=float, default=SIGN_WINDOW_SECONDS,
                         help=f"Seconds per saved clip (default SIGN_WINDOW_SECONDS = {SIGN_WINDOW_SECONDS})")
     parser.add_argument("--output_dir", default=str(OUTPUT_DIR))
+    parser.add_argument("--rotate", default="auto", choices=["auto", "0", "90", "180", "270"],
+                        help="Degrees to turn the video clockwise to make it upright "
+                             "(default: detect it)")
     parser.add_argument("--dry_run", action="store_true", help="Only report; write nothing")
+    parser.add_argument("--extra", type=int, default=0,
+                        help="Also accept up to this many repetitions more than --expected")
+    parser.add_argument("--skip", type=int, nargs="*", default=[],
+                        help="Rep numbers to leave out (e.g. wrong ones the signer noted)")
     parser.add_argument("--force", action="store_true", help="Write even if the count isn't --expected")
     parser.add_argument("--replace", action="store_true",
                         help="Delete this signer's existing clips for the label first")
@@ -250,8 +336,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     if VOCAB_PATH.exists() and f'"{args.label}"' not in VOCAB_PATH.read_text(encoding="utf-8"):
         print(f"Note: '{args.label}' isn't in {VOCAB_PATH.name} yet; add it before training.")
 
+    rotation = detect_rotation(video) if args.rotate == "auto" else int(args.rotate)
+    if rotation:
+        print(f"The video is sideways or upside down; turning it {rotation} degrees clockwise.")
     print(f"Analysing {video.name} ...")
-    times, keypoints, src_fps, duration = analyse(video)
+    times, keypoints, src_fps, duration = analyse(video, rotation=rotation)
     _, hand, pose_ok = activity_signal(keypoints)
     print(f"  {duration:.1f} s at {src_fps:.0f} fps; body found in {pose_ok.mean():.0%} of frames")
 
@@ -260,11 +349,28 @@ def main(argv: Optional[List[str]] = None) -> int:
         lo, hi = clip_window(start, end, args.window, duration)
         inside = (times >= start) & (times <= end)
         reps.append(Repetition(start, end, lo, hi, float(hand[inside].mean()) if inside.any() else 0.0))
+    if reps and is_stop_reach(reps[-1].start, reps[-1].end, reps[-1].hand_tracked, duration):
+        print(f"  Left out the movement at {reps[-1].start:.1f} s: reaching for the phone at the end, not a sign.")
+        reps.pop()
+    for r in [r for r in reps[:1] + reps[-1:] if cut_by_recording(r.start, r.end, duration)]:
+        print(f"  Left out {r.start:.1f}-{r.end:.1f} s: the recording "
+              f"{'started' if r.start <= EDGE_TOLERANCE else 'stopped'} in the middle of it.")
+        reps.remove(r)
+    if len(reps) >= 5:
+        typical = float(np.median([r.duration for r in reps]))
+        merged = [r for r in reps if r.duration > MERGED_FACTOR * typical]
+        for r in merged:
+            print(f"  Left out {r.start:.1f}-{r.end:.1f} s ({r.duration:.1f} s, typical {typical:.1f} s): "
+                  f"probably two reps without a rest between them.")
+        reps = [r for r in reps if r not in merged]
+    if args.skip:
+        print(f"  Left out rep(s) {', '.join(map(str, args.skip))} as asked (--skip; numbers as in a run without it).")
+        reps = [r for n, r in enumerate(reps, 1) if n not in set(args.skip)]
 
     print(f"\n  {'#':>3}  {'start':>6}  {'end':>6}  {'sign':>5}  {'clip':>13}  hands")
     for n, r in enumerate(reps, 1):
         flags = []
-        if r.duration > args.window:
+        if r.duration > r.clip_end - r.clip_start:
             flags.append("LONGER THAN CLIP")
         if r.hand_tracked < 0.6:
             flags.append("weak hand tracking")
@@ -277,15 +383,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     if reps:
         d = np.array([r.duration for r in reps])
         print(f"\n  Sign length: median {np.median(d):.2f} s, range {d.min():.2f}-{d.max():.2f} s "
-              f"(clip window {args.window:.2f} s)")
+              f"(clips {args.window:.2f} s, longer for slow signs)")
 
     if args.plot is not None:
         plot_path = Path(args.plot) if args.plot else video.with_name(video.stem + "_split.png")
         save_plot(plot_path, times, keypoints, reps)
         print(f"  Plot: {plot_path}")
 
-    count_ok = len(reps) == args.expected
-    print(f"\n  Found {len(reps)} repetitions (expected {args.expected})"
+    count_ok = args.expected <= len(reps) <= args.expected + args.extra
+    wanted = f"{args.expected}" + (f"-{args.expected + args.extra}" if args.extra else "")
+    print(f"\n  Found {len(reps)} repetitions (expected {wanted})"
           + ("" if count_ok else " -- check the table/plot; re-record or pass --expected / --force"))
     if args.dry_run or not reps or not (count_ok or args.force):
         print("  Nothing written.")
@@ -298,7 +405,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             p.with_name(p.stem + "_kp.npy").unlink(missing_ok=True)
     first = next_clip_index(sign_dir, signer)
     paths = [sign_dir / clip_filename(signer, first + n) for n in range(len(reps))]
-    write_clips(video, [(r.clip_start, r.clip_end) for r in reps], paths)
+    write_clips(video, [(r.clip_start, r.clip_end) for r in reps], paths, rotation=rotation)
     print(f"  Wrote {len(paths)} clips: {paths[0].name} .. {paths[-1].name} in {sign_dir}")
     print("  Next: python scripts/extract_landmarks.py")
     return 0

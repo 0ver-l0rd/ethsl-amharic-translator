@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "2.0",
-    "total_signs": 71,
+    "total_signs": 75,
     "language": "Ethiopian Sign Language (EthSL)",
     "output_language": "Amharic",
     "reference": "Gonfa et al., Scientific Reports 15:36181 (2025)",
@@ -451,6 +451,30 @@
         "amharic": "ዓመት",
         "description": "year",
         "id": 70
+      },
+      {
+        "label": "enat",
+        "amharic": "እናት",
+        "description": "mother",
+        "id": 71
+      },
+      {
+        "label": "abat",
+        "amharic": "አባት",
+        "description": "father",
+        "id": 72
+      },
+      {
+        "label": "guadegna",
+        "amharic": "ጓደኛ",
+        "description": "friend",
+        "id": 73
+      },
+      {
+        "label": "megzat",
+        "amharic": "መግዛት",
+        "description": "buy",
+        "id": 74
       }
     ]
   }

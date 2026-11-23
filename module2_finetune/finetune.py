@@ -97,6 +97,53 @@ def evaluate_model(model, X, y, labels, split_name: str) -> dict:
     }
 
 
+def _range(aug_cfg: dict, name: str, default=None):
+    """(min, max) from <name>_min / <name>_max in the config, or `default` if absent."""
+    if f"{name}_min" not in aug_cfg:
+        return default
+    return (aug_cfg[f"{name}_min"], aug_cfg[f"{name}_max"])
+
+
+def augmentation_from_config(tr_cfg: dict):
+    """The AugmentationPipeline that config.yaml's training section asks for (None = off)."""
+    if not tr_cfg.get("use_augmentation", True):
+        return None
+    aug_cfg = tr_cfg.get("augmentation", {})
+    return AugmentationPipeline(
+        mirror_prob=aug_cfg.get("mirror_prob", 0.5),
+        noise_std=aug_cfg.get("noise_std", 0.02),
+        jitter_frames=aug_cfg.get("jitter_frames", 3),
+        speed_range=_range(aug_cfg, "speed", (0.7, 1.4)),
+        scale_range=_range(aug_cfg, "scale", (0.85, 1.15)),
+        dropout_prob=aug_cfg.get("dropout_prob", 0.1),
+        tilt_degrees=aug_cfg.get("tilt_degrees", 0),
+        stretch_x_range=_range(aug_cfg, "stretch_x"),
+        stretch_y_range=_range(aug_cfg, "stretch_y"),
+        hand_scale_range=_range(aug_cfg, "hand_scale"),
+    )
+
+
+class FreshAugmentedCopies(keras.utils.PyDataset):
+    """Training batches: every clip as recorded plus a newly augmented copy of it, each epoch."""
+
+    def __init__(self, X, y, batch_size, aug):
+        super().__init__()
+        self.X, self.y, self.batch_size, self.aug = X, y, batch_size, aug
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.order) / self.batch_size))
+
+    def on_epoch_end(self):
+        self.order = np.random.permutation(2 * len(self.y))   # index >= n: augmented copy
+
+    def __getitem__(self, i):
+        idx = self.order[i * self.batch_size:(i + 1) * self.batch_size]
+        n = len(self.y)
+        clips = [self.aug(self.X[j - n]) if j >= n else self.X[j] for j in idx]
+        return np.stack(clips).astype(np.float32), self.y[idx % n]
+
+
 # ---------------------------------------------------------------------------
 # Single architecture fine-tuning
 # ---------------------------------------------------------------------------
@@ -138,37 +185,38 @@ def train_model(arch: str, cfg: dict, train: tuple, val: tuple, run_dir: Path):
     )
 
     # Augment training data
-    aug_cfg = tr_cfg.get("augmentation", {})
-    aug = AugmentationPipeline(
-        mirror_prob=aug_cfg.get("mirror_prob", 0.5),
-        noise_std=aug_cfg.get("noise_std", 0.02),
-        jitter_frames=aug_cfg.get("jitter_frames", 3),
-        scale_range=(aug_cfg.get("scale_min", 0.85), aug_cfg.get("scale_max", 1.15)),
-        dropout_prob=aug_cfg.get("dropout_prob", 0.1),
-    ) if tr_cfg.get("use_augmentation", True) else None
-
+    aug = augmentation_from_config(tr_cfg)
     X_train, y_train = train
-    if aug:
-        X_aug = np.stack([aug(x) for x in X_train])
-        X_train = np.concatenate([X_train, X_aug])
-        y_train = np.concatenate([y_train, y_train])
-        print(f"  Augmented train size: {X_train.shape[0]}")
-
     X_val, y_val = val
 
     # Callbacks
     run_dir.mkdir(parents=True, exist_ok=True)
     callbacks = build_callbacks(cfg, run_dir)
 
-    # Train
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=ft_cfg["epochs"],
-        batch_size=ft_cfg["batch_size"],
-        callbacks=callbacks,
-        verbose=1,
-    )
+    # Train: each clip once as recorded plus one augmented copy per epoch,
+    # either new every epoch (fresh_each_epoch) or made once up front
+    if aug and tr_cfg.get("augmentation", {}).get("fresh_each_epoch", False):
+        print(f"  Training on {len(y_train)} clips + a new augmented copy of each every epoch")
+        history = model.fit(
+            FreshAugmentedCopies(X_train, y_train, ft_cfg["batch_size"], aug),
+            validation_data=(X_val, y_val),
+            epochs=ft_cfg["epochs"],
+            callbacks=callbacks,
+            verbose=1,
+        )
+    else:
+        if aug:
+            X_train = np.concatenate([X_train, np.stack([aug(x) for x in X_train])])
+            y_train = np.concatenate([y_train, y_train])
+            print(f"  Augmented train size: {X_train.shape[0]}")
+        history = model.fit(
+            X_train, y_train,
+            validation_data=(X_val, y_val),
+            epochs=ft_cfg["epochs"],
+            batch_size=ft_cfg["batch_size"],
+            callbacks=callbacks,
+            verbose=1,
+        )
 
     # Load best checkpoint
     best_ckpt = run_dir / "best.keras"

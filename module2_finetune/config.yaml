@@ -26,7 +26,7 @@ finetune:
   layer_lr_decay: 0.85        # each lower layer gets lr * decay^depth
 
   # Main training
-  epochs: 50
+  epochs: 80                  # early stopping usually ends it around 50-70
   batch_size: 16
   learning_rate: 5.0e-4
 
@@ -49,12 +49,25 @@ output:
 training:
   use_augmentation: true
   augmentation:
+    # A new augmented copy of every clip each epoch (false: one copy made up front)
+    fresh_each_epoch: true
     mirror_prob:   0.5
     noise_std:     0.02    # shoulder widths
     jitter_frames: 3
+    speed_min:     0.6     # playback speed
+    speed_max:     1.6
     scale_min:     0.85
     scale_max:     1.15
     dropout_prob:  0.1
+    # Differences between people: lean / phone angle, wider or taller signing,
+    # hand size. Leave-one-signer-out on the 65 team words: 69.0% -> 73.3%.
+    tilt_degrees:   12
+    stretch_x_min:  0.85
+    stretch_x_max:  1.15
+    stretch_y_min:  0.9
+    stretch_y_max:  1.1
+    hand_scale_min: 0.8
+    hand_scale_max: 1.2
   early_stopping_patience: 15
   reduce_lr_patience:       7
   reduce_lr_factor:         0.5

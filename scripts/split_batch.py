@@ -7,7 +7,8 @@ summary table.
 Videos are named <signer>_<number>, e.g. s03_07.mp4; the number is looked up
 in data/our_words.tsv for the word's label. A second version of a word
 (another way to sign it) can be added as a letter, e.g. "s03_29 a.mp4" and
-"s03_29 b.mp4"; both go to the same word.
+"s03_29 b.mp4"; both go to the same word and are always split together
+(--only "s03_29 b" also splits "s03_29 a"), so no version's clips are lost.
 
 Each video is turned upright if needed and must contain --expected
 repetitions; videos that don't are left out and listed at the end with a plot
@@ -31,7 +32,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(Path(__file__).parent))
@@ -63,6 +64,20 @@ def parse_name(path: Path) -> Optional[Tuple[str, str, str]]:
     return m.group("signer").lower(), num, (m.group("variant") or "").lower()
 
 
+def select_videos(folder: Path, only=None) -> List[Path]:
+    """The videos to split, every version of a word together and in order (plain/a, then b, ...).
+
+    Splitting a word replaces the signer's earlier clips of it, so asking for one
+    version of a word (e.g. "s01_29 b") also brings in its other versions
+    ("s01_29"); otherwise their clips would be lost.
+    """
+    videos = [p for p in folder.iterdir() if p.suffix.lower() in VIDEO_EXTS and not p.name.startswith(".")]
+    if only:
+        wanted = {parse_name(Path(name))[:2] if parse_name(Path(name)) else name for name in only}
+        videos = [p for p in videos if p.stem in only or (parse_name(p) and parse_name(p)[:2] in wanted)]
+    return sorted(videos, key=lambda p: (parse_name(p) or (p.stem, "", ""), p.name))
+
+
 def main(argv=None) -> int:
     import split_recording
 
@@ -78,8 +93,7 @@ def main(argv=None) -> int:
 
     folder = Path(args.folder).expanduser()
     words = load_words()
-    videos = sorted(p for p in folder.iterdir() if p.suffix.lower() in VIDEO_EXTS
-                    and (not args.only or p.stem in args.only))
+    videos = select_videos(folder, args.only)
     report = folder / "split_report"
     report.mkdir(exist_ok=True)
 
@@ -90,7 +104,7 @@ def main(argv=None) -> int:
             if len(parts) > 1:
                 skips[" ".join(p for p in parts if not p.isdigit())] = [p for p in parts if p.isdigit()]
 
-    rows, done = [], set()
+    rows, done, failed = [], set(), set()
     for n, video in enumerate(videos, 1):
         parsed = parse_name(video)
         if not parsed or parsed[1] not in words:
@@ -98,6 +112,12 @@ def main(argv=None) -> int:
             continue
         signer, num, variant = parsed
         label, amharic = words[num]
+        if (signer, label) in failed and not args.dry_run:
+            # an earlier version of this word failed and wrote nothing; writing this
+            # one would replace (delete) that version's earlier clips
+            rows.append((video.name, f"{amharic} ({label})", "", "", "",
+                         "SKIPPED: fix the other version of this word first"))
+            continue
         mode = "--append" if (signer, label) in done else "--replace"
         cmd = [str(video), "--label", label, "--signer", signer, "--expected", str(args.expected), "--extra", str(args.extra), mode,
                "--plot", str(report / f"{video.stem}_split.png")] + (["--dry_run"] if args.dry_run else []) \
@@ -115,6 +135,8 @@ def main(argv=None) -> int:
         ok = args.expected <= found <= args.expected + args.extra and code == 0
         if ok and not args.dry_run:
             done.add((signer, label))
+        elif not ok and (signer, label) not in done:
+            failed.add((signer, label))
         status = ("ok" if args.dry_run else "written") if ok else \
             (f"CHECK: found {found}, see split_report/{video.stem}_split.png" if found else
              text.strip().splitlines()[-1] if text.strip() else f"failed (exit {code})")

@@ -1,4 +1,4 @@
-"""Tests for scripts/split_batch.py name parsing and the word table."""
+"""Tests for scripts/split_batch.py: name parsing, the word table and which videos are split."""
 
 import sys
 from pathlib import Path
@@ -23,3 +23,14 @@ def test_word_table_is_complete_and_unique():
     labels = [label for label, _ in words.values()]
     assert len(set(labels)) == 65
     assert words["01"] == ("selam", "ሰላም") and words["E1"] == ("misgana", "ምስጋና")
+
+
+def test_one_version_brings_in_the_other_versions_of_the_word(tmp_path):
+    from split_batch import select_videos
+    for name in ["s01_29.mp4", "s01_29 b.mp4", "s01_30.mp4", "s01_55 b.mp4", "s01_55 a.mp4", "s02_29.mp4"]:
+        (tmp_path / name).touch()
+    names = lambda only: [p.name for p in select_videos(tmp_path, only)]
+    assert names(["s01_29 b"]) == ["s01_29.mp4", "s01_29 b.mp4"]
+    assert names(["s01_55 b"]) == ["s01_55 a.mp4", "s01_55 b.mp4"]
+    assert names(["s01_30"]) == ["s01_30.mp4"]
+    assert len(names(None)) == 6

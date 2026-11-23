@@ -181,6 +181,63 @@ def test_scale_leaves_visibility_and_missing():
     assert (scaled[0, 132:195] == 0).all()
 
 
+def test_tilt_rotates_about_mid_shoulder_and_keeps_the_rest():
+    seq = body_relative(raw_sequence(missing_lh=[0]))
+    lay = layout(258)
+    np.random.seed(1)
+    out = aug.tilt(seq, max_degrees=12)
+    xy, xy_out = seq[:, lay.xyz[:, :2]], out[:, lay.xyz[:, :2]]
+    np.testing.assert_allclose(np.hypot(*np.moveaxis(xy_out, -1, 0)),
+                               np.hypot(*np.moveaxis(xy, -1, 0)), rtol=1e-5)   # distances kept
+    assert not np.allclose(xy_out, xy)                                         # but turned
+    angle = np.arctan2(xy_out[..., 1], xy_out[..., 0]) - np.arctan2(xy[..., 1], xy[..., 0])
+    assert np.abs(np.rad2deg(np.angle(np.exp(1j * angle[seq[:, lay.xyz[:, 0]] != 0])))).max() <= 12 + 1e-3
+    np.testing.assert_array_equal(out[:, lay.xyz[:, 2]], seq[:, lay.xyz[:, 2]])  # depth
+    np.testing.assert_array_equal(out[:, lay.visibility], seq[:, lay.visibility])
+    assert (out[0, 132:195] == 0).all()
+
+
+def test_stretch_xy_scales_x_and_y_separately():
+    seq = body_relative(raw_sequence(missing_lh=[0]))
+    lay = layout(258)
+    out = aug.stretch_xy(seq, x_range=(1.1, 1.1), y_range=(0.9, 0.9))
+    np.testing.assert_allclose(out[:, lay.xyz[:, 0]], seq[:, lay.xyz[:, 0]] * 1.1, rtol=1e-6)
+    np.testing.assert_allclose(out[:, lay.xyz[:, 1]], seq[:, lay.xyz[:, 1]] * 0.9, rtol=1e-6)
+    np.testing.assert_array_equal(out[:, lay.xyz[:, 2]], seq[:, lay.xyz[:, 2]])
+    np.testing.assert_array_equal(out[:, lay.visibility], seq[:, lay.visibility])
+    assert (out[0, 132:195] == 0).all()
+
+
+def test_scale_hands_grows_each_hand_about_its_wrist():
+    seq = body_relative(raw_sequence(missing_lh=[0, 1]))
+    out = aug.scale_hands(seq, scale_range=(1.2, 1.2))
+    np.testing.assert_array_equal(out[:, :132], seq[:, :132])                # pose untouched
+    for first in (132, 195):
+        hand, hand_out = (s[2:, first:first + 63].reshape(-1, 21, 3) for s in (seq, out))
+        np.testing.assert_allclose(hand_out[:, 0], hand[:, 0], rtol=1e-6)    # wrist stays
+        np.testing.assert_allclose(hand_out - hand_out[:, :1], (hand - hand[:, :1]) * 1.2,
+                                   rtol=1e-5, atol=1e-6)
+    assert (out[:2, 132:195] == 0).all()                                     # missing stays missing
+
+
+@pytest.mark.parametrize("mode", ["none", "subset"])
+def test_pipeline_with_signer_variation_keeps_shape_and_missing(mode):
+    seq = body_relative(raw_sequence(FEATURE_DIMS[mode], missing_lh=range(T)))
+    pipe = aug.AugmentationPipeline(mirror_prob=0.0, dropout_prob=0.0, tilt_degrees=12,
+                                    stretch_x_range=(0.85, 1.15), stretch_y_range=(0.9, 1.1),
+                                    hand_scale_range=(0.8, 1.2))
+    out = pipe(seq)
+    assert out.shape == seq.shape
+    assert (out[:, 132:195] == 0).all()
+    assert not np.allclose(out, seq)
+
+
+def test_signer_variation_is_off_by_default():
+    pipe = aug.AugmentationPipeline()
+    assert pipe.tilt_degrees == 0
+    assert pipe.stretch_x_range is pipe.stretch_y_range is pipe.hand_scale_range is None
+
+
 @pytest.mark.parametrize("mode", ["none", "subset"])
 def test_pipeline_keeps_shape_and_missing(mode):
     seq = body_relative(raw_sequence(FEATURE_DIMS[mode], missing_lh=range(T)))

@@ -25,8 +25,6 @@ pose, left hand, right hand, face. Clips with missing frames are skipped.
 Usage:
   python scripts/convert_gonfa.py --dataset_dir "C:/.../Senior Project"
   python scripts/convert_gonfa.py --dataset_dir ... --face subset
-
-Authors: EthSL Team
 """
 
 import argparse

@@ -12,8 +12,6 @@ most recent SIGN_WINDOW_SECONDS to SEQUENCE_LENGTH evenly spaced frames using
 frame timestamps. This keeps training and live sequences on the same time
 scale even though the camera runs at ~25 FPS while recording and the live app
 (MediaPipe-bound) runs at ~10 FPS.
-
-Authors: Bersabeh Dawit
 """
 
 import time

@@ -11,8 +11,6 @@ Instructions:
 
 Usage:
   python scripts/process_cesl.py --input_dir data/raw_cesl --output_dir data/landmarks
-
-Authors: EthSL Team
 """
 
 import cv2

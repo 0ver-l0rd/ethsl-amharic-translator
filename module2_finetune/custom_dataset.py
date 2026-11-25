@@ -6,8 +6,6 @@ Dataset loader for the EthSL landmark dataset.
 Loads processed .npy arrays and creates both:
   - Signer-dependent splits (train/val/test from same signers)
   - Signer-independent splits (held-out signer as test)
-
-Authors: Bersabeh Dawit, Menase Teshale
 """
 
 import numpy as np

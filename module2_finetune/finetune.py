@@ -14,8 +14,6 @@ Usage:
   cd module2_finetune
   python finetune.py --config config.yaml
   python finetune.py --config config.yaml --arch bilstm  # single architecture
-
-Authors: Estifanos Behailu, Emanuel Solomon
 """
 
 import os

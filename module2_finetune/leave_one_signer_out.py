@@ -12,8 +12,6 @@ Usage:
   cd module2_finetune
   python leave_one_signer_out.py --arch gru --tag gru
   python leave_one_signer_out.py --arch lstm --pretrained ../models/pretrained/islr_lstm.h5 --tag lstm_islr
-
-Authors: EthSL Team
 """
 
 import argparse

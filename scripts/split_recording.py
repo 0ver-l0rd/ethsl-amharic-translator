@@ -26,8 +26,6 @@ Usage:
   python scripts/split_recording.py s02_E1.mov --label misgana --expected 15 --replace
 
 Then run extract_landmarks.py and preprocess.py as usual.
-
-Authors: EthSL Team
 """
 
 import re

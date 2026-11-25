@@ -10,8 +10,6 @@ app/web_app.py), without touching the model the live app uses:
   3. A team member compares its scores with the current model's and calls
      promote() to make it the live model; the old one is kept as
      models/finetuned/previous_model.h5
-
-Authors: Estifanos Behailu
 """
 
 import json

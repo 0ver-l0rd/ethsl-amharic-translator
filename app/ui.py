@@ -9,8 +9,6 @@ Renders a HUD showing:
   - The last recognised sign (large Amharic text) and its confidence
   - Rolling sentence history
   - FPS counter and speech toggle indicator
-
-Authors: Menase Teshale
 """
 
 import os

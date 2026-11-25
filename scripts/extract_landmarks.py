@@ -16,8 +16,6 @@ Usage:
   python scripts/extract_landmarks.py                 # pose + hands (258 features)
   python scripts/extract_landmarks.py --face subset   # + lips/eyes/eyebrows (534)
   python scripts/extract_landmarks.py --face full     # + full face mesh (1662)
-
-Authors: Bersabeh Dawit
 """
 
 import cv2

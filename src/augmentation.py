@@ -10,8 +10,6 @@ All augmentations operate on numpy arrays of shape (T, D) where:
 They expect NORMALIZED sequences (SequenceBuilder.normalize_sequence): the
 origin is the signer's mid-shoulder point and the unit is the shoulder width,
 so x = 0 is the body's midline. Missing landmarks are zeros and stay zeros.
-
-Authors: Estifanos Behailu
 """
 
 import numpy as np

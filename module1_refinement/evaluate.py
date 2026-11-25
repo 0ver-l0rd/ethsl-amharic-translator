@@ -15,8 +15,6 @@ Outputs a detailed report to the console and saves:
 
 Usage:
   python evaluate.py --model ../models/refined/best_model.h5 --config config.yaml
-
-Authors: All team members
 """
 
 import sys

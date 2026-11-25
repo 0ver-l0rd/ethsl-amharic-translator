@@ -12,8 +12,6 @@ a slow sign (sequence_builder.sign_window), which is how the training clips
 are cut too.
 
 No MediaPipe or TensorFlow import, so it can be tested on its own.
-
-Authors: Estifanos Behailu
 """
 
 from collections import deque

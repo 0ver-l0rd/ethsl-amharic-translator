@@ -11,7 +11,6 @@ Each returns a compiled Keras model with:
   input shape : (SEQUENCE_LENGTH, FEATURE_DIM)
   output      : softmax over NUM_CLASSES
 
-Authors: Estifanos Behailu, Emanuel Solomon
 Reference: Gonfa et al., Scientific Reports, 2025 (doi:10.1038/s41598-025-19937-0)
 """
 

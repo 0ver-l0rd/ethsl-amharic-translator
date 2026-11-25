@@ -11,8 +11,6 @@ These weights are then transferred and the final layers replaced
 for the EthSL vocabulary.
 
 Run this script ONCE before running refine_model.py.
-
-Authors: Emanuel Solomon
 """
 
 import os

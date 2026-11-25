@@ -13,8 +13,6 @@ arrays; extract_landmarks.py still reads those.)
 
 Signer IDs are short codes like "s01" rather than names, so the dataset
 stays anonymous. They must not contain underscores (used as the separator).
-
-Authors: EthSL Team
 """
 
 import re

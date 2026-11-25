@@ -11,8 +11,6 @@ the face mode (none / subset / full) as (x, y, z). Missing landmarks are zeros.
 
 This module does not import MediaPipe (~13 s), so preprocessing and training
 stay fast; landmark_extractor.py is loaded only for the face subset indices.
-
-Authors: Estifanos Behailu
 """
 
 from functools import lru_cache

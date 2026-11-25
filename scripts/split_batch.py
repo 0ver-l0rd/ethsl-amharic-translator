@@ -21,8 +21,6 @@ Bad reps found on review go in <folder>/skip.txt, one video per line, e.g.
 Usage:
   python scripts/split_batch.py "~/Desktop/Senior Project/recordings/s03" --dry_run
   python scripts/split_batch.py "~/Desktop/Senior Project/recordings/s03"
-
-Authors: Estifanos Behailu
 """
 
 import argparse

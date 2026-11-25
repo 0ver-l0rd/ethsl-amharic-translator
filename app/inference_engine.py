@@ -2,8 +2,6 @@
 app/inference_engine.py
 ========================
 Optimized inference pipeline wrapping the trained Keras model.
-
-Authors: Emanuel Solomon
 """
 
 import numpy as np

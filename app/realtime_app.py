@@ -25,8 +25,6 @@ Keyboard controls:
   r     : Reset buffer (clear current sign window)
   s     : Toggle speech output on/off
   c     : Clear the sentence history
-
-Authors: Emanuel Solomon, Menase Teshale
 """
 
 import cv2

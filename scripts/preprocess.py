@@ -11,8 +11,6 @@ which split_dataset.py needs for the signer-independent split.
 Usage:
   python scripts/preprocess.py
   python scripts/preprocess.py --input_dir data/landmarks --output_dir data/processed
-
-Authors: Bersabeh Dawit
 """
 
 import numpy as np

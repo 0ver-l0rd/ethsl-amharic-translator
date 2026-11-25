@@ -24,8 +24,6 @@ Usage:
   python scripts/collect_data.py --signer s01
   python scripts/collect_data.py --signer s02 --signs selam,awo,ay  # specific signs only
   python scripts/collect_data.py --signer s01 --sequences 20        # 20 clips per sign
-
-Authors: Bersabeh Dawit, Menase Teshale
 """
 
 import cv2

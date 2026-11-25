@@ -4,12 +4,13 @@ src/clip_naming.py
 Single source of truth for how recorded clips are named, so that the
 signer who performed each clip survives every pipeline stage:
 
-  collect_data.py      ->  data/landmarks/<label>/<signer>_seq_007.mp4
+  split_recording.py   ->  data/landmarks/<label>/<signer>_seq_007.mp4
+  (or collect_data.py, or an approved upload from the web app)
   extract_landmarks.py ->  data/landmarks/<label>/<signer>_seq_007_kp.npy
+  preprocess.py        ->  data/processed/signer_ids.npy  (one ID per sample)
 
 (Clips recorded before the switch to video are <signer>_seq_007.npy frame
 arrays; extract_landmarks.py still reads those.)
-  preprocess.py        ->  data/processed/signer_ids.npy  (one ID per sample)
 
 Signer IDs are short codes like "s01" rather than names, so the dataset
 stays anonymous. They must not contain underscores (used as the separator).

@@ -3,8 +3,9 @@ scripts/extract_landmarks.py
 ==============================
 MediaPipe Holistic landmark extraction pipeline.
 
-Processes the clips saved by collect_data.py and extracts MediaPipe pose +
-hand (+ optional face) landmarks, resampled to SEQUENCE_LENGTH frames.
+Processes the clips cut by split_recording.py (or recorded by collect_data.py,
+or approved from web-app uploads) and extracts MediaPipe pose + hand
+(+ optional face) landmarks, resampled to SEQUENCE_LENGTH frames.
 
 Input:  data/landmarks/<sign_label>/<signer>_seq_XXX.mp4   (or legacy .npy frames)
 Output: data/landmarks/<sign_label>/<signer>_seq_XXX_kp.npy  (landmark arrays)

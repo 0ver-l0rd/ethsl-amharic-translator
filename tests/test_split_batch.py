@@ -34,3 +34,28 @@ def test_one_version_brings_in_the_other_versions_of_the_word(tmp_path):
     assert names(["s01_55 b"]) == ["s01_55 a.mp4", "s01_55 b.mp4"]
     assert names(["s01_30"]) == ["s01_30.mp4"]
     assert len(names(None)) == 6
+
+
+def test_by_motion_is_passed_to_the_splitter(tmp_path, monkeypatch):
+    import split_batch
+    import split_recording
+    (tmp_path / "s04_30.mp4").write_bytes(b"")
+    calls = []
+    monkeypatch.setattr(split_recording, "main", lambda argv: calls.append(argv) or 0)
+    split_batch.main([str(tmp_path), "--by_motion", "--dry_run"])
+    split_batch.main([str(tmp_path), "--dry_run"])
+    assert "--by_motion" in calls[0] and "--by_motion" not in calls[1]
+
+
+def test_marks_are_passed_and_unmarked_videos_skipped(tmp_path, monkeypatch):
+    import split_batch
+    import split_recording
+    (tmp_path / "s04_30.mp4").write_bytes(b"")
+    (tmp_path / "s04_31.mp4").write_bytes(b"")
+    split_recording.write_marks(tmp_path / "s04_30.marks.txt", [(1.0, False), (3.0, False)])
+    calls = []
+    monkeypatch.setattr(split_recording, "main",
+                        lambda argv: calls.append(argv) or print("  Found 2 repetitions") or 0)
+    assert split_batch.main([str(tmp_path), "--marks", "--no_extract"]) == 1   # s04_31 isn't marked
+    assert len(calls) == 1 and calls[0][0].endswith("s04_30.mp4")
+    assert calls[0][calls[0].index("--marks") + 1].endswith("s04_30.marks.txt")

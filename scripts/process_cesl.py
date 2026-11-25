@@ -1,8 +1,12 @@
 """
 scripts/process_cesl.py
 ========================
-Helper script to process the downloaded CESL (Continuous Ethiopian Sign Language)
-dataset videos into MediaPipe landmark sequences for our pipeline.
+Draft helper for turning CESL (Continuous Ethiopian Sign Language) dataset
+videos into landmark files. It has never been run on the real dataset: the
+folder layout (one folder per word, or <word>_NN.mp4 names) is a guess, each
+whole video is squeezed into 30 frames (wrong for continuous signing, which
+holds several signs), and the output names carry no signer ID, so
+preprocess.py can't tell the signers apart. Check all three before using it.
 
 Instructions:
 1. Request access to CESL on Zenodo: https://zenodo.org/records/10800699

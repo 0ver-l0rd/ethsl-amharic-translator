@@ -1,16 +1,14 @@
 """
 module1_refinement/download_pretrained.py
 ==========================================
-Downloads pre-built sign language model weights from public sources
-and prepares them for refinement.
+Meant to download ready-trained sign language weights to start from, but
+both download links in PRETRAINED_SOURCES are dead (404 when checked on
+2026-11-25), so in practice it only saves randomly initialised "scaffold"
+weights with the right architecture (--scaffold_only, or as the fallback).
 
-Strategy: We use the landmark-based LSTM architecture from the
-closest open-source repository matching the EthSL pipeline
-(MediaPipe + LSTM trained on ASL/general SL datasets).
-These weights are then transferred and the final layers replaced
-for the EthSL vocabulary.
-
-Run this script ONCE before running refine_model.py.
+The real starting point is models/pretrained/islr_lstm.h5, trained on the
+Kaggle ISLR (ASL) data by pretrain_islr.py; refine_model.py and finetune.py
+use that.
 """
 
 import os

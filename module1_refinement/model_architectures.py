@@ -11,6 +11,8 @@ Each returns a compiled Keras model with:
   input shape : (SEQUENCE_LENGTH, FEATURE_DIM)
   output      : softmax over NUM_CLASSES
 
+fast_predictor() wraps a model for quick one-at-a-time guesses in the live app.
+
 Reference: Gonfa et al., Scientific Reports, 2025 (doi:10.1038/s41598-025-19937-0)
 """
 

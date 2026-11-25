@@ -242,9 +242,10 @@ class AugmentationPipeline:
     hand_scale_range : tuple or None
         (min, max) hand size about the wrist. None (the default) disables it.
 
-    Tilt, stretch and hand size imitate differences between people; they
-    raised the unseen-signer accuracy on the team's 65 words from 69.0% to
-    73.3% (leave-one-signer-out, 2026-11-23).
+    Tilt, stretch and hand size imitate differences between people. Tilt and
+    stretch raised the unseen-signer accuracy (leave-one-signer-out over the 4
+    team signers) from 68.7% to 72.9%; hand size on top lowered it to 71.6%,
+    so config.yaml leaves it out (2026-11-24).
     """
 
     def __init__(

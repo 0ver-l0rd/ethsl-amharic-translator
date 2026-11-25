@@ -8,9 +8,18 @@ The signer rests with their hands fully down for about a second between
 repetitions. MediaPipe tracks the wrists on every frame; a repetition is a
 stretch where a hand is tracked or a wrist is clearly above its resting
 height. Each repetition is saved as a clip centred on it, SIGN_WINDOW_SECONDS
-long or longer for a slow sign (sequence_builder.sign_window), centred on
-it, the same length collect_data.py records, so training clips and the live
-app's window cover the same amount of time.
+long or longer for a slow sign (sequence_builder.sign_window), the same way
+the live app cuts its window around each sign, so both cover the same amount
+of time.
+
+Some signers keep their hands up in front of the chest and only pause
+between repetitions. For them, --by_motion finds the repetitions as bursts
+of hand movement between still moments instead; check its plot or table.
+
+When neither works, mark the start of each repetition by hand while watching
+the video (scripts/mark_reps.py) and split with --marks; the reps are lined
+up by their movement, so the marks only need to fall at the same moment of
+each rep.
 
 Input:  a video named <signer>_<word>.mp4 / .mov, e.g. s01_01.mp4, s02_E1.mov
 Output: data/landmarks/<label>/<signer>_seq_XXX.mp4  (one per repetition)
@@ -18,7 +27,7 @@ Output: data/landmarks/<label>/<signer>_seq_XXX.mp4  (one per repetition)
 Nothing is written unless exactly --expected repetitions are found (or up
 to --extra more, for signers who do a spare one or two; use
 --force to write anyway). Check the printed table, and the --plot image if
-the count is off.
+the count is off. With --marks the marked reps are cut, whatever their number.
 
 Usage:
   python scripts/split_recording.py ~/Downloads/s01_01.mp4 --label selam --dry_run --plot
@@ -40,9 +49,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import clip_filename, next_clip_index, parse_signer, validate_signer_id
-from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER
+from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER, POSE_DIMS, body_relative
 from src.sequence_builder import SIGN_WINDOW_SECONDS, sign_window
-from src.sign_spotter import activity_signal   # shared with the live app
+from src.sign_spotter import activity_signal, HAND_DIMS, LEFT_WRIST, RIGHT_WRIST   # shared with the live app
 from src.video_io import open_clip_writer
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "landmarks"
@@ -65,6 +74,12 @@ STOP_REACH_END   = 1.0  # s from the end of the video
 STOP_REACH_HANDS = 0.5  # below this share of frames with a hand detected
 STOP_REACH_LEN   = 2.5  # s; longer stretches hold a real sign
 EDGE_TOLERANCE   = 0.05 # s; a rep this close to the start or end of the video was cut off
+# --by_motion: signers who keep their hands up and only pause between reps
+MOTION_SMOOTH    = 0.25 # s; hand speed is averaged over this long
+MOTION_EDGE      = 0.1  # s; a burst this close to the hands coming up / going down ...
+MOTION_SHORT     = 0.6  # ... and shorter than this x the typical burst is raising / lowering them
+MOTION_MIN_PAUSE = 0.35 # s; shorter still moments are inside one sign
+MOTION_LEVELS    = tuple(np.round(np.arange(0.10, 0.56, 0.05), 2))  # tried moving-speed thresholds
 
 _NAME_RE = re.compile(r"^(?P<signer>[A-Za-z0-9-]+)_(?P<word>[A-Za-z0-9-]+)$")
 
@@ -131,6 +146,214 @@ def find_repetitions(
             merged.append([a, b])
     return [(float(times[a]), float(times[b])) for a, b in merged if times[b] - times[a] >= min_sign]
 
+
+def hand_speed(times: np.ndarray, keypoints: np.ndarray, smooth: float = MOTION_SMOOTH) -> np.ndarray:
+    """
+    How fast the hands move in each frame (shoulder widths per second, smoothed
+    over `smooth` seconds): the fastest of the two wrists and the two hands'
+    points, measured relative to the body. Points not found count as still.
+    """
+    rel = body_relative(keypoints)
+    parts = [rel[:, [w * 4, w * 4 + 1]] for w in (LEFT_WRIST, RIGHT_WRIST)]
+    for first in (POSE_DIMS, POSE_DIMS + HAND_DIMS):
+        parts.append(rel[:, first:first + HAND_DIMS].reshape(len(rel), -1, 3)[..., :2].reshape(len(rel), -1))
+    dt = np.diff(times)
+    speed = np.zeros(len(rel))
+    for p in parts:
+        found = (p != 0).any(axis=1)
+        both = found[1:] & found[:-1]
+        step = np.linalg.norm((p[1:] - p[:-1]).reshape(len(dt), -1, 2), axis=2).mean(axis=1)
+        moved = np.zeros(len(rel))
+        moved[1:][both] = step[both] / np.maximum(dt[both], 1e-6)
+        speed = np.maximum(speed, moved)
+    k = max(1, int(round(smooth / np.median(dt)))) if len(dt) else 1
+    return np.convolve(speed, np.ones(k) / k, mode="same")
+
+
+def motion_bursts(times: np.ndarray, keypoints: np.ndarray, level: float,
+                  speed: Optional[np.ndarray] = None) -> List[Tuple[float, float]]:
+    """
+    (start, end) of each burst of hand movement between still pauses, while the
+    hands are up. A frame is moving when its speed is more than `level` of the
+    way from the still speed (15th percentile) to the signing speed (90th).
+    A short burst right where the hands come up or go down is only the raising
+    or lowering of the hands, and is left out.
+    """
+    speed = hand_speed(times, keypoints) if speed is None else speed
+    _, hand, _ = activity_signal(keypoints)
+    seen = np.flatnonzero(hand)
+    if len(seen) == 0:
+        return []
+    up = (times >= times[seen[0]]) & (times <= times[seen[-1]])
+    still, signing = np.percentile(speed[up], 15), np.percentile(speed[up], 90)
+    moving = up & (speed > still + level * (signing - still))
+
+    edges = np.diff(np.concatenate([[0], moving.astype(int), [0]]))
+    runs = list(zip(np.flatnonzero(edges == 1), np.flatnonzero(edges == -1) - 1))
+    merged: List[List[int]] = []
+    for a, b in runs:
+        if merged and times[a] - times[merged[-1][1]] < MOTION_MIN_PAUSE:
+            merged[-1][1] = b
+        else:
+            merged.append([a, b])
+    bursts = [(float(times[a]), float(times[b])) for a, b in merged if times[b] - times[a] >= MIN_SIGN]
+    if len(bursts) >= 3:
+        typical = float(np.median([e - s for s, e in bursts]))
+        first, last = times[seen[0]], times[seen[-1]]
+        if bursts[-1][1] >= last - MOTION_EDGE and bursts[-1][1] - bursts[-1][0] < MOTION_SHORT * typical:
+            bursts.pop()                                   # lowering the hands
+        if bursts[0][0] <= first + MOTION_EDGE and bursts[0][1] - bursts[0][0] < MOTION_SHORT * typical:
+            bursts.pop(0)                                  # raising the hands
+    return bursts
+
+
+def find_repetitions_by_motion(times: np.ndarray, keypoints: np.ndarray, expected: int,
+                               extra: int = 0) -> Tuple[List[Tuple[float, float]], float]:
+    """
+    Repetitions of a signer who keeps their hands up and only pauses between
+    them, as (spans, level). Every level in MOTION_LEVELS is tried; of those
+    giving expected..expected+extra usable bursts (not two reps run together,
+    which main() leaves out), the count found at the most levels wins (the
+    steadiest answer) and its middle level is used. If no level gives a count
+    in range, MOTION_LEVELS' middle level is used and the count is off.
+    """
+    def usable(bursts):
+        if len(bursts) < 5:
+            return len(bursts)
+        typical = float(np.median([e - s for s, e in bursts]))
+        return sum(e - s <= MERGED_FACTOR * typical for s, e in bursts)
+
+    speed = hand_speed(times, keypoints)
+    found = {level: motion_bursts(times, keypoints, level, speed) for level in MOTION_LEVELS}
+    count = {level: usable(b) for level, b in found.items()}
+    fits = [lv for lv in MOTION_LEVELS if expected <= count[lv] <= expected + extra]
+    if not fits:
+        level = MOTION_LEVELS[len(MOTION_LEVELS) // 2]
+        return found[level], level
+    counts = [count[lv] for lv in fits]
+    best = max(set(counts), key=lambda c: (counts.count(c), -abs(c - expected)))
+    levels = [lv for lv in fits if count[lv] == best]
+    level = levels[len(levels) // 2]
+    return found[level], level
+
+
+def marks_path(video: Path) -> Path:
+    """Where mark_reps.py saves the marks for a video: next to it, <stem>.marks.txt."""
+    return Path(video).with_name(Path(video).stem + ".marks.txt")
+
+
+def read_marks(path: Path) -> Tuple[List[Tuple[float, bool]], Optional[float]]:
+    """([(start, skip), ...] sorted by time, end of the last rep or None) from a marks file.
+
+    One line per repetition: its start in seconds, followed by "skip" if it is
+    a bad rep to leave out. An "end <seconds>" line marks where the last rep
+    finishes. Lines starting with # are comments.
+    """
+    marks, end = [], None
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        parts = line.split("#")[0].split()
+        if not parts:
+            continue
+        if parts[0].lower() == "end":
+            end = float(parts[1])
+        else:
+            marks.append((float(parts[0]), len(parts) > 1 and parts[1].lower() == "skip"))
+    return sorted(marks), end
+
+
+def write_marks(path: Path, marks: List[Tuple[float, bool]], end: Optional[float] = None,
+                video_name: str = "") -> None:
+    """Save marks in the format read_marks reads."""
+    lines = [f"# Repetition starts in {video_name} (seconds), from mark_reps.py.",
+             "# 'skip' = a bad rep to leave out; 'end' = where the last rep finishes."]
+    lines += [f"{t:.2f}" + (" skip" if skip else "") for t, skip in sorted(marks)]
+    if end is not None:
+        lines.append(f"end {end:.2f}")
+    Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+MARK_SHIFT = 0.6    # s; each marked rep may move this much to line up with the others
+MARK_LEVEL = 0.3    # moving-speed level, from still to fast, in the word's average movement
+MARK_MERGE = 0.4    # s; shorter still moments inside the average movement belong to the sign
+MARK_PART  = 0.15   # a burst with this share of the strongest one's movement is part of the sign
+
+
+def reps_from_marks(times: np.ndarray, keypoints: np.ndarray, starts: List[float],
+                    end: Optional[float] = None) -> List[Tuple[float, float]]:
+    """
+    (start, end) of each repetition marked by hand, one per mark.
+
+    The marks only need to fall at the same moment of every rep, not at its
+    exact start: a signer who holds the end of a sign until the next rep makes
+    "where a rep starts" hard to see. The hand speed after each mark is lined
+    up with the others (each rep may move up to MARK_SHIFT), and their median
+    is the word's typical movement over one mark-to-mark gap. From the first
+    to the last clear burst of it (the still hold left out; it may run past
+    the next mark) is the sign, and each rep gets that stretch after its own
+    mark. `end` is
+    accepted for older marks files and not needed. A rep with much less
+    movement than the others (weak_marked_reps) is not a sign.
+    """
+    starts = np.sort(np.asarray(starts, dtype=float))
+    if len(starts) == 0:
+        return []
+    gap = float(np.median(np.diff(starts))) if len(starts) > 1 else SIGN_WINDOW_SECONDS
+    dt = float(np.median(np.diff(times))) if len(times) > 1 else 1 / ANALYSIS_FPS
+    speed = hand_speed(times, keypoints)
+    k = int(round(MARK_SHIFT / dt))
+    n = max(int(round(gap / dt)), 1)
+    tau = np.arange(-k, n + k) * dt                       # around each mark, room to shift
+    profiles = np.array([np.interp(m + tau, times, speed) for m in starts])
+    core = slice(k, k + n)                                # one gap after the mark
+
+    shifts = np.zeros(len(starts), dtype=int)             # in samples
+    for _ in range(3):
+        template = np.median([p[k + s:k + s + n] for p, s in zip(profiles, shifts)], axis=0)
+        t0 = template - template.mean()
+        for i, p in enumerate(profiles):
+            scores = [float(((p[k + d:k + d + n] - p[k + d:k + d + n].mean()) * t0).sum())
+                      for d in range(-k, k + 1)]
+            shifts[i] = int(np.argmax(scores)) - k
+    template = np.median([p[k + s:k + s + n] for p, s in zip(profiles, shifts)], axis=0)
+
+    lo, hi = np.percentile(template, 10), np.percentile(template, 95)
+    if hi - lo < 1e-6:                                    # no movement to go by: mark to mark
+        nxt = list(starts[1:]) + [starts[-1] + gap]
+        return [(float(a), float(b)) for a, b in zip(starts, nxt)]
+    # The movement repeats every gap and may wrap past the next mark: look for it
+    # starting from the stillest moment, so it is never cut in two.
+    w = max(int(round(0.2 / dt)), 1)
+    rot = int(np.argmin(np.convolve(np.concatenate([template, template[:w]]), np.ones(w) / w, "valid")[:n]))
+    turned = np.roll(template, -rot)
+    runs: List[List[int]] = []
+    for i in np.flatnonzero(turned > lo + MARK_LEVEL * (hi - lo)):
+        if runs and (i - runs[-1][1]) * dt < MARK_MERGE:
+            runs[-1][1] = i
+        else:
+            runs.append([i, i])
+    # every clear burst is part of the sign (e.g. to the chin and back out again)
+    energy = [float((turned[a:b + 1] - lo).sum()) for a, b in runs]
+    clear = [r for r, e in zip(runs, energy) if e >= MARK_PART * max(energy)] if runs else [[0, n - 1]]
+    best = [clear[0][0], clear[-1][1]]
+    first = (best[0] + rot) % n
+    if first >= 0.75 * n:                                 # just before the mark: that rep's sign
+        first -= n
+    on, off = first * dt, (first + best[1] - best[0]) * dt
+    return [(float(m + s * dt + on), float(m + s * dt + off)) for m, s in zip(starts, shifts)]
+
+
+MARK_WEAK = 0.4     # a marked rep moving less than this x the typical rep holds no sign
+
+
+def weak_marked_reps(times: np.ndarray, keypoints: np.ndarray, spans: List[Tuple[float, float]]) -> List[bool]:
+    """True for each span with much less hand movement than the typical one (e.g. a
+    mark past the last sign)."""
+    speed = hand_speed(times, keypoints)
+    still = np.percentile(speed, 10)
+    moved = np.array([float(np.mean(speed[(times >= a) & (times <= b)] - still))
+                      if ((times >= a) & (times <= b)).any() else 0.0 for a, b in spans])
+    typical = np.median(moved) if len(moved) else 0.0
+    return [bool(typical > 0 and m < MARK_WEAK * typical) for m in moved]
 
 def cut_by_recording(start: float, end: float, video_duration: float) -> bool:
     """True for a rep already going when the recording started or still going when it
@@ -306,6 +529,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--skip", type=int, nargs="*", default=[],
                         help="Rep numbers to leave out (e.g. wrong ones the signer noted)")
     parser.add_argument("--force", action="store_true", help="Write even if the count isn't --expected")
+    parser.add_argument("--by_motion", action="store_true",
+                        help="Find reps by hand movement and still pauses, for signers who keep "
+                             "their hands up between reps instead of lowering them")
+    parser.add_argument("--marks", nargs="?", const="", default=None,
+                        help="Cut the reps marked by hand with mark_reps.py (default file: "
+                             "<video>.marks.txt next to the video) instead of finding them")
     parser.add_argument("--replace", action="store_true",
                         help="Delete this signer's existing clips for the label first")
     parser.add_argument("--append", action="store_true",
@@ -331,6 +560,13 @@ def main(argv: Optional[List[str]] = None) -> int:
               f"Pass --replace to redo them or --append to add more.")
         return 2
 
+    marks_file = None
+    if args.marks is not None:
+        marks_file = Path(args.marks).expanduser() if args.marks else marks_path(video)
+        if not marks_file.exists():
+            print(f"ERROR: no marks file {marks_file}. Mark the reps first: python scripts/mark_reps.py {video}")
+            return 2
+
     if VOCAB_PATH.exists() and f'"{args.label}"' not in VOCAB_PATH.read_text(encoding="utf-8"):
         print(f"Note: '{args.label}' isn't in {VOCAB_PATH.name} yet; add it before training.")
 
@@ -343,18 +579,36 @@ def main(argv: Optional[List[str]] = None) -> int:
     print(f"  {duration:.1f} s at {src_fps:.0f} fps; body found in {pose_ok.mean():.0%} of frames")
 
     reps = []
-    for start, end in find_repetitions(times, keypoints):
+    keep = None
+    if marks_file is not None:
+        marks, marks_end = read_marks(marks_file)
+        spans = reps_from_marks(times, keypoints, [t for t, _ in marks], marks_end)
+        keep = [not skip for _, skip in marks]
+        print(f"  Using the {len(marks)} reps marked by hand in {marks_file.name}"
+              + (f"; leaving out the {keep.count(False)} marked skip" if not all(keep) else ""))
+        for n, ((a, b), weak) in enumerate(zip(spans, weak_marked_reps(times, keypoints, spans)), 1):
+            if weak and keep[n - 1]:
+                print(f"  Left out marked rep {n} ({a:.1f}-{b:.1f} s): hardly any movement, no sign there.")
+                keep[n - 1] = False
+    elif args.by_motion:
+        spans, level = find_repetitions_by_motion(times, keypoints, args.expected, args.extra)
+        print(f"  Split by movement (hands kept up between reps); moving-speed level {level:.2f}")
+    else:
+        spans = find_repetitions(times, keypoints)
+    for start, end in spans:
         lo, hi = clip_window(start, end, args.window, duration)
         inside = (times >= start) & (times <= end)
         reps.append(Repetition(start, end, lo, hi, float(hand[inside].mean()) if inside.any() else 0.0))
-    if reps and is_stop_reach(reps[-1].start, reps[-1].end, reps[-1].hand_tracked, duration):
+    if keep is not None:                  # marked by hand: the marks decide, no automatic checks
+        reps = [r for r, k in zip(reps, keep) if k]
+    if keep is None and reps and is_stop_reach(reps[-1].start, reps[-1].end, reps[-1].hand_tracked, duration):
         print(f"  Left out the movement at {reps[-1].start:.1f} s: reaching for the phone at the end, not a sign.")
         reps.pop()
-    for r in [r for r in reps[:1] + reps[-1:] if cut_by_recording(r.start, r.end, duration)]:
+    for r in [r for r in reps[:1] + reps[-1:] if keep is None and cut_by_recording(r.start, r.end, duration)]:
         print(f"  Left out {r.start:.1f}-{r.end:.1f} s: the recording "
               f"{'started' if r.start <= EDGE_TOLERANCE else 'stopped'} in the middle of it.")
         reps.remove(r)
-    if len(reps) >= 5:
+    if keep is None and len(reps) >= 5:
         typical = float(np.median([r.duration for r in reps]))
         merged = [r for r in reps if r.duration > MERGED_FACTOR * typical]
         for r in merged:
@@ -390,6 +644,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     count_ok = args.expected <= len(reps) <= args.expected + args.extra
     wanted = f"{args.expected}" + (f"-{args.expected + args.extra}" if args.extra else "")
+    if keep is not None:                  # the marks are the count
+        count_ok, wanted = len(reps) > 0, "as marked"
     print(f"\n  Found {len(reps)} repetitions (expected {wanted})"
           + ("" if count_ok else " -- check the table/plot; re-record or pass --expected / --force"))
     if args.dry_run or not reps or not (count_ok or args.force):

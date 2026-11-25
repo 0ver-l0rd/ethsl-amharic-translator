@@ -15,6 +15,11 @@ repetitions; videos that don't are left out and listed at the end with a plot
 of what the splitter saw (in <folder>/split_report/). Re-running replaces the
 signer's earlier clips of a word. Landmarks are extracted at the end.
 
+A signer who keeps their hands up and only pauses between reps (instead of
+lowering them) needs --by_motion: reps are then found by hand movement.
+If that fails too, mark the reps by hand with scripts/mark_reps.py and split
+with --marks: each video is cut at its <video>.marks.txt, whatever the count.
+
 Bad reps found on review go in <folder>/skip.txt, one video per line, e.g.
   s02_13  5        (rep 5 of s02_13 is left out on every re-run)
 
@@ -85,6 +90,10 @@ def main(argv=None) -> int:
     parser.add_argument("--extra", type=int, default=0,
                         help="Also accept up to this many repetitions more than --expected")
     parser.add_argument("--only", nargs="*", help="Only these videos (file names without extension)")
+    parser.add_argument("--by_motion", action="store_true",
+                        help="Find reps by movement, for signers who keep their hands up between reps")
+    parser.add_argument("--marks", action="store_true",
+                        help="Cut each video at the reps marked with mark_reps.py (<video>.marks.txt)")
     parser.add_argument("--no_extract", action="store_true", help="Don't extract landmarks at the end")
     parser.add_argument("--dry_run", action="store_true", help="Only report; write nothing")
     args = parser.parse_args(argv)
@@ -116,9 +125,15 @@ def main(argv=None) -> int:
             rows.append((video.name, f"{amharic} ({label})", "", "", "",
                          "SKIPPED: fix the other version of this word first"))
             continue
+        if args.marks and not split_recording.marks_path(video).exists():
+            rows.append((video.name, f"{amharic} ({label})", "", "", "",
+                         "SKIPPED: not marked yet (scripts/mark_reps.py)"))
+            failed.add((signer, label))
+            continue
         mode = "--append" if (signer, label) in done else "--replace"
         cmd = [str(video), "--label", label, "--signer", signer, "--expected", str(args.expected), "--extra", str(args.extra), mode,
-               "--plot", str(report / f"{video.stem}_split.png")] + (["--dry_run"] if args.dry_run else []) \
+               "--plot", str(report / f"{video.stem}_split.png")] + (["--dry_run"] if args.dry_run else []) + (["--by_motion"] if args.by_motion else []) \
+            + (["--marks", str(split_recording.marks_path(video))] if args.marks else []) \
             + (["--skip", *skips[video.stem]] if video.stem in skips else [])
         print(f"[{n}/{len(videos)}] {video.name} -> {amharic} ({label})", flush=True)
         out = io.StringIO()
@@ -130,7 +145,7 @@ def main(argv=None) -> int:
         found = int(found.group(1)) if found else 0
         turned = re.search(r"turning it (\d+) degrees", text)
         median = re.search(r"median ([\d.]+) s", text)
-        ok = args.expected <= found <= args.expected + args.extra and code == 0
+        ok = code == 0 and (found > 0 if args.marks else args.expected <= found <= args.expected + args.extra)
         if ok and not args.dry_run:
             done.add((signer, label))
         elif not ok and (signer, label) not in done:

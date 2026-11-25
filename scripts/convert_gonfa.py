@@ -19,8 +19,10 @@ Each word's clips are in signer order, 40 per signer, so clip // 40 is the
 signer. Gonfa signers are named g01-g07 so they never share an ID with our own
 signers (s01, s02, ...); a shared ID would merge two people in the
 signer-independent evaluation. Re-running replaces earlier converter output
-(landmark files with no video beside them) but keeps our recorded clips. Frames are stored as pose, face, left hand, right hand; our layout is
-pose, left hand, right hand, face. Clips with missing frames are skipped.
+(landmark files with no video beside them) but keeps our recorded clips.
+
+Frames are stored as pose, face, left hand, right hand; our layout is pose,
+left hand, right hand, face. Clips with missing frames are skipped.
 
 Usage:
   python scripts/convert_gonfa.py --dataset_dir "C:/.../Senior Project"

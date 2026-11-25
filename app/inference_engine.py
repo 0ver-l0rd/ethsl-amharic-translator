@@ -1,7 +1,14 @@
 """
 app/inference_engine.py
-========================
-Optimized inference pipeline wrapping the trained Keras model.
+=======================
+Loads the trained sign model and turns one landmark sequence (30 frames x 258
+features) into a guess: the sign's label, its Amharic word and the model's
+confidence. A guess below the confidence threshold (0.65 by default) is
+returned as None. Used by both the web app and the desktop app.
+
+The model runs through fast_predictor, a compiled function that is faster
+than model.predict for one sequence at a time, and is warmed up when loaded
+so the first real guess isn't slow.
 """
 
 import numpy as np

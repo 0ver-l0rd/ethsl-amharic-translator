@@ -5,7 +5,7 @@ Retrain the model on everything in data/landmarks (used by the Retrain tab of
 app/web_app.py), without touching the model the live app uses:
 
   1. preprocess.py and split_dataset.py rebuild the dataset, holding out the
-     test signer (s04 once Menase's recordings are in, until then Gonfa g07)
+     test signer (s04, Menase; Gonfa g07 if there are no s04 clips)
   2. finetune.py trains the ISLR-pretrained LSTM into models/candidate/
   3. A team member compares its scores with the current model's and calls
      promote() to make it the live model; the old one is kept as

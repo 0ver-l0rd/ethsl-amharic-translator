@@ -28,7 +28,7 @@ def test_config_turns_on_signer_variation():
     assert cfg["training"]["augmentation"]["fresh_each_epoch"] is True
     assert pipe.tilt_degrees == 12
     assert pipe.stretch_x_range == (0.85, 1.15) and pipe.stretch_y_range == (0.9, 1.1)
-    assert pipe.hand_scale_range == (0.8, 1.2)
+    assert pipe.hand_scale_range is None          # hurt the unseen-signer score (2026-11-24)
     assert pipe.speed_range == (0.6, 1.6)
 
 

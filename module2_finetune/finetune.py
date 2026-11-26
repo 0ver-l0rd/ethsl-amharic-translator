@@ -9,13 +9,13 @@ Features:
   - Signer-dependent AND signer-independent evaluation
   - Per-class F1, precision, recall metrics
   - Saves comparison table to CSV
+  - Training clips are augmented as set in config.yaml (a new augmented copy
+    of every clip each epoch when fresh_each_epoch is on)
 
 Usage:
   cd module2_finetune
   python finetune.py --config config.yaml
   python finetune.py --config config.yaml --arch bilstm  # single architecture
-
-Authors: Estifanos Behailu, Emanuel Solomon
 """
 
 import os

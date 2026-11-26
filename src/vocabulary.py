@@ -5,8 +5,6 @@ Utilities for loading and using the EthSL sign vocabulary.
 
 Provides a Vocabulary class that loads vocabulary.json and exposes
 label <=> Amharic text mapping functions.
-
-Authors: Estifanos Behailu, Emanuel Solomon
 """
 
 import json

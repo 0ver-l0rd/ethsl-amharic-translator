@@ -20,8 +20,6 @@ Clips already converted are skipped, so the script can be stopped and re-run.
 Usage:
   python scripts/convert_dictionary.py --dict_dir "C:/.../ETHSL-2946-WORDS/ETHSL-2946-WORDS"
   python scripts/convert_dictionary.py --dict_dir ... --limit 10      # quick test
-
-Authors: EthSL Team
 """
 
 import argparse

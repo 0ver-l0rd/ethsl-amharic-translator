@@ -18,8 +18,6 @@ Contributors get anonymous signer IDs (c01, c02, ...; the team keeps
 s01-s04), so the signer-independent evaluation can tell people apart. The
 name -> ID table stays in data/contributions/signers.json, which is never
 committed.
-
-Authors: Estifanos Behailu
 """
 
 import json

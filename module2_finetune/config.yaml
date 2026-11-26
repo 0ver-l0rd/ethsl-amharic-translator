@@ -59,15 +59,15 @@ training:
     scale_min:     0.85
     scale_max:     1.15
     dropout_prob:  0.1
-    # Differences between people: lean / phone angle, wider or taller signing,
-    # hand size. Leave-one-signer-out on the 65 team words: 69.0% -> 73.3%.
+    # Differences between people: lean / phone angle, wider or taller signing.
+    # Leave-one-signer-out over the 4 team signers (3 seeds each): 68.7% with
+    # one fixed copy -> 72.9% with these. Hand size (hand_scale_min/max) is left
+    # out: adding it too gave 71.6%, and 60.6% instead of 66.1% for s04.
     tilt_degrees:   12
     stretch_x_min:  0.85
     stretch_x_max:  1.15
     stretch_y_min:  0.9
     stretch_y_max:  1.1
-    hand_scale_min: 0.8
-    hand_scale_max: 1.2
   early_stopping_patience: 15
   reduce_lr_patience:       7
   reduce_lr_factor:         0.5

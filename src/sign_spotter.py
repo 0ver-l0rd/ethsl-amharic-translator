@@ -5,15 +5,13 @@ Finds where each sign starts and ends in the live camera stream, so the app
 classifies once per sign instead of guessing on every frame.
 
 A sign is a stretch where a hand is tracked and a wrist is clearly above its
-resting height, the same test split_recording.py uses to cut the training
+resting height, close to the test split_recording.py uses to cut the training
 clips. When the hands have been down for MIN_REST, the sign is over; the
 classifier gets a window centred on it, SIGN_WINDOW_SECONDS long or longer for
 a slow sign (sequence_builder.sign_window), which is how the training clips
 are cut too.
 
 No MediaPipe or TensorFlow import, so it can be tested on its own.
-
-Authors: Estifanos Behailu
 """
 
 from collections import deque

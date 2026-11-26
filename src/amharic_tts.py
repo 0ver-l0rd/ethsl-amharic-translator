@@ -5,8 +5,6 @@ Amharic Text-to-Speech (TTS) engine wrapper.
 
 Uses Google Text-to-Speech (gTTS) with language code 'am' (Amharic).
 Audio is saved to a temp file and played back via playsound.
-
-Authors: Estifanos Behailu
 """
 
 import os

@@ -15,8 +15,6 @@ Usage:
   cd module1_refinement
   python refine_model.py --config config.yaml
   python refine_model.py --config config.yaml --from_scratch  # random init
-
-Authors: Estifanos Behailu, Emanuel Solomon
 """
 
 import os

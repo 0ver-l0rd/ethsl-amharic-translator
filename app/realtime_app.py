@@ -22,11 +22,9 @@ Usage:
 
 Keyboard controls:
   q     : Quit
-  r     : Reset buffer (clear current sign window)
+  r     : Reset (drop the sign in progress and the last word)
   s     : Toggle speech output on/off
   c     : Clear the sentence history
-
-Authors: Emanuel Solomon, Menase Teshale
 """
 
 import cv2

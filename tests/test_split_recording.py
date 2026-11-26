@@ -163,3 +163,66 @@ def test_rep_cut_off_by_the_recording_is_noticed():
     assert cut_by_recording(0.0, 1.2, 40.0)                   # already signing at the start
     assert cut_by_recording(38.5, 40.0, 40.0)                 # still signing at the end
     assert not cut_by_recording(0.2, 1.4, 40.0)
+
+
+# ---------------------------------------------------------------------------
+# --by_motion: a signer who keeps their hands up and only pauses between reps
+# ---------------------------------------------------------------------------
+
+def hands_up_track(segments, up=(1.0, 39.0), duration=40.0, fps=FPS, lowering=None):
+    """
+    Keypoints for a signer whose right hand is up (tracked, at chest height) from
+    up[0] to up[1] and moves only during each (start, end) segment; still in
+    between. `lowering` adds a short movement just before the hand goes down.
+    """
+    times = np.arange(0, duration, 1 / fps)
+    kp = np.zeros((len(times), POSE_DIMS + 2 * HAND_DIMS), dtype=np.float32)
+    pose = kp[:, :POSE_DIMS].reshape(-1, 33, 4)
+    pose[:, LEFT_SHOULDER, :2] = (0.6, 0.4)
+    pose[:, RIGHT_SHOULDER, :2] = (0.4, 0.4)
+    pose[:, [LEFT_WRIST, RIGHT_WRIST], 1] = 0.8                 # resting below the frame
+    hand = kp[:, POSE_DIMS + HAND_DIMS:].reshape(-1, 21, 3)
+    raised = (times >= up[0]) & (times <= up[1])
+    pose[raised, RIGHT_WRIST, :2] = (0.45, 0.5)                  # held in front of the chest
+    hand[raised, :, :2] = 0.45 + np.linspace(0, 0.05, 21)[:, None]
+    moves = list(segments) + ([lowering] if lowering else [])
+    for start, end in moves:
+        m = (times >= start) & (times <= end)
+        wobble = 0.08 * np.sin(2 * np.pi * 2.0 * (times[m] - start))
+        pose[m, RIGHT_WRIST, 0] += wobble
+        hand[m, :, 0] += wobble[:, None]
+    return times, kp
+
+
+def test_hands_kept_up_defeat_the_height_split_but_not_the_motion_split():
+    from split_recording import find_repetitions_by_motion
+    segs = [(2.0 + 2.4 * k, 3.0 + 2.4 * k) for k in range(15)]
+    times, kp = hands_up_track(segs)
+    assert len(find_repetitions(times, kp)) <= 1                  # one long "sign"
+    found, level = find_repetitions_by_motion(times, kp, expected=15, extra=2)
+    assert len(found) == 15
+    for (s, e), (fs, fe) in zip(segs, found):
+        assert abs(fs - s) < 0.3 and abs(fe - e) < 0.3
+
+
+def test_motion_split_leaves_out_lowering_the_hands():
+    from split_recording import find_repetitions_by_motion
+    segs = [(2.0 + 2.4 * k, 3.0 + 2.4 * k) for k in range(15)]
+    times, kp = hands_up_track(segs, up=(1.0, 38.5), lowering=(38.2, 38.5))
+    found, _ = find_repetitions_by_motion(times, kp, expected=15, extra=2)
+    assert len(found) == 15
+    assert found[-1][1] < 37.0
+
+
+def test_motion_split_reports_a_wrong_count():
+    from split_recording import find_repetitions_by_motion
+    segs = [(2.0 + 2.4 * k, 3.0 + 2.4 * k) for k in range(10)]
+    found, _ = find_repetitions_by_motion(*hands_up_track(segs), expected=15, extra=2)
+    assert len(found) == 10                                       # main() then writes nothing
+
+
+def test_motion_split_with_no_hands_finds_nothing():
+    from split_recording import find_repetitions_by_motion
+    times = np.arange(0, 10, 1 / FPS)
+    kp = np.zeros((len(times), POSE_DIMS + 2 * HAND_DIMS), dtype=np.float32)
+    assert find_repetitions_by_motion(times, kp, expected=15)[0] == []

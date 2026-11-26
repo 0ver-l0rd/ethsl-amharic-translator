@@ -17,8 +17,6 @@ Usage:
   python scripts/split_dataset.py
   python scripts/split_dataset.py --val_frac 0.15 --test_frac 0.15
   python scripts/split_dataset.py --holdout_signer s04
-
-Authors: Bersabeh Dawit, Menase Teshale
 """
 
 import sys

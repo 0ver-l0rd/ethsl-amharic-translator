@@ -17,8 +17,6 @@ The subset keeps the facial regions that carry meaning in sign language
 (eyebrows mark questions, the mouth and eyes carry expression) without
 letting jaw/cheek contours dominate the input. Holistic computes the face
 mesh on every frame regardless, so the mode does not change speed.
-
-Authors: Menase Teshale, Bersabeh Dawit
 """
 
 import cv2

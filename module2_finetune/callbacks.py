@@ -2,8 +2,6 @@
 module2_finetune/callbacks.py
 ==============================
 Training callbacks for Keras fine-tuning.
-
-Authors: Emanuel Solomon
 """
 
 import sys

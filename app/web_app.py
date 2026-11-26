@@ -19,8 +19,6 @@ Usage:
   python app/web_app.py --public     # Translate and Add a video only (for hosting)
 
 Then open http://127.0.0.1:7860 in a browser.
-
-Authors: Estifanos Behailu
 """
 
 import argparse

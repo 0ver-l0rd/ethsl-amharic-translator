@@ -9,8 +9,6 @@ app (app/realtime_app.py) and the web page (app/web_app.py):
   - after each sign the model classifies it once; below the confidence
     threshold it says "Not sure" instead of guessing
   - it keeps the last recognised word, the history and short notices
-
-Authors: Estifanos Behailu
 """
 
 import sys

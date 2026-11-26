@@ -6,14 +6,13 @@ Builds fixed-length landmark sequences from raw per-frame landmark arrays.
 Each sign is represented as a tensor of shape (SEQUENCE_LENGTH, FEATURE_DIM),
 e.g. (30, 258) for a 30-frame window with pose+hands only.
 
-A sign window is defined by DURATION (SIGN_WINDOW_SECONDS), not by a frame
-count: recording captures exactly that long, and the live app resamples the
-most recent SIGN_WINDOW_SECONDS to SEQUENCE_LENGTH evenly spaced frames using
-frame timestamps. This keeps training and live sequences on the same time
-scale even though the camera runs at ~25 FPS while recording and the live app
-(MediaPipe-bound) runs at ~10 FPS.
-
-Authors: Bersabeh Dawit
+A sign window is defined by DURATION, not by a frame count: a window centred
+on the sign, SIGN_WINDOW_SECONDS long or longer for a slow sign (sign_window,
+up to MAX_CLIP_SECONDS), resampled to SEQUENCE_LENGTH evenly spaced frames
+using frame timestamps. The splitter cuts the training clips and the live app
+cuts its windows this way, so both see signs on the same time scale whatever
+the frame rate (phone recordings run at 30-60 FPS, the live app, limited by
+MediaPipe, much slower).
 """
 
 import time

@@ -7,8 +7,6 @@ Clips are stored as compressed .mp4 video (~1% of the size of raw frame
 arrays) so landmarks can be re-extracted later with different settings
 (e.g. a different face mode) without re-recording. Legacy .npy clips
 (raw BGR frame arrays) can still be read.
-
-Authors: EthSL Team
 """
 
 import sys

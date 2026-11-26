@@ -40,6 +40,7 @@ from src import contributions as contrib
 from src import retrain
 from src.clip_naming import parse_signer
 from src.amharic_tts import AmharicTTS
+from src.phrases import phrases_for
 from src.sign_spotter import Status
 from src.vocabulary import LABEL_RE, Vocabulary
 from app.live_session import LiveSession
@@ -117,7 +118,8 @@ def session_for(request: gr.Request):
         _close_idle(now)
         engine = get_engine()
         _, seq_len, dim = engine.model.input_shape
-        _sessions[key] = [LiveSession(engine, sequence_length=seq_len),
+        phrases = phrases_for(Vocabulary(str(contrib.VOCAB_PATH)))
+        _sessions[key] = [LiveSession(engine, sequence_length=seq_len, phrases=phrases),
                           LandmarkExtractor(face_mode=face_mode_for_dim(dim)), threading.Lock(), now]
     _sessions[key][3] = now
     return _sessions[key]
@@ -137,8 +139,13 @@ def word_html(s: LiveSession) -> str:
                 'Sign one word, then lower your hands. The word appears here.</div>')
     pct = round(s.confidence * 100)
     bar = "#16a34a" if s.confidence >= 0.8 else "#d97706"
-    return (f'<div style="padding:8px 4px"><div style="font-size:4rem;line-height:1.2">{s.amharic}</div>'
-            f'<div style="opacity:.7;margin-bottom:8px">{s.label.replace("_", " ")}</div>'
+    if s.phrase:      # the sign completed a phrase: show the sentence and the signs that made it
+        big, small = s.phrase.amharic, " + ".join(s.phrase_signs) + (f"  ·  {s.phrase.english}" if s.phrase.english else "")
+    else:
+        big, small = s.amharic, s.label.replace("_", " ")
+    size = "4rem" if len(big) <= 10 else "2.6rem"
+    return (f'<div style="padding:8px 4px"><div style="font-size:{size};line-height:1.2">{big}</div>'
+            f'<div style="opacity:.7;margin-bottom:8px">{small}</div>'
             f'<div style="background:rgba(128,128,128,.25);border-radius:6px;height:12px">'
             f'<div style="background:{bar};width:{pct}%;height:12px;border-radius:6px"></div></div>'
             f'<div style="margin-top:4px">{pct}% sure</div></div>')

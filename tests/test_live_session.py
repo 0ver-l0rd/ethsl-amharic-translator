@@ -64,7 +64,7 @@ def test_same_word_twice_counts_twice():
 def test_hands_up_too_long_gives_a_hint():
     _, engine, words, messages = run(0.9, [(1.0, 1.0 + MAX_SIGN + 2)], duration=12.0)
     assert words == [] and engine.calls == 0
-    assert "Lower your hands between signs" in messages
+    assert "Pause or lower your hands between signs" in messages
 
 
 def test_reset_and_clear():

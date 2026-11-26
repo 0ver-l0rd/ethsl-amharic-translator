@@ -53,6 +53,7 @@ ethsl-amharic-translator/
 |   |-- landmarks/              # Extracted MediaPipe landmark arrays (.npy)
 |   |-- processed/              # Normalized, fixed-length sequences
 |   |-- vocabulary.json         # Sign label <=> Amharic text mapping
+|   |-- phrases.json            # Demo phrases: signs in a row -> an Amharic sentence
 |   `-- splits/                 # train / val / test split indices
 |
 |-- scripts/
@@ -265,7 +266,11 @@ python app/web_app.py --public   # Translate and Add a video only (for hosting)
 
 Both guess once per sign: a sign starts when the hands come up and ends when
 they are lowered, and below 65% confidence the app says "Not sure" instead of
-guessing. The browser version also has tabs for adding training videos,
+guessing. Signs made one after another can form a phrase from
+`data/phrases.json` (እንዴት + አንተ -> "እንዴት ነህ?"); the signs may come in
+either order, each within 6 seconds of the one before, and the hands may stay
+up if they pause between signs. Only the phrase is said: a word that could
+start one is shown at once, but said only if no sign follows within 1.5 s. The browser version also has tabs for adding training videos,
 reviewing them, and retraining.
 
 ---
@@ -302,7 +307,7 @@ See `module2_finetune/README.md` for full details.
 ## Vocabulary
 
 The system targets **50-100 common EthSL signs**. `data/vocabulary.json` has
-71 words: the 15 from the Gonfa et al. dataset (written first by
+75 words: the 15 from the Gonfa et al. dataset (written first by
 `scripts/convert_gonfa.py`, which keeps the words after them), then the team's
 own recordings. The team records the 65 words in `data/our_words.tsv`: 60
 everyday words and 5 that are also in the Gonfa data:

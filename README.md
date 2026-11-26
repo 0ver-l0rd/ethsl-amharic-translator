@@ -151,11 +151,12 @@ cd ethsl-amharic-translator
 python3.12 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-mkdir -p models/finetuned          # put best_model.h5 in this folder
-python app/web_app.py              # then open http://127.0.0.1:7860
+python app/web                     # opens the app in the browser
 ```
-`python app/realtime_app.py --model models/finetuned/best_model.h5` opens the
-desktop window instead. Sign one word at a time; to sign a phrase, pause with
+The app finds the model itself: it uses `models/finetuned/best_model.h5`, and
+if that is missing it copies the newest `best_model.h5` from Downloads (where
+Telegram saves it) into place. `python app/realtime_app.py` opens the desktop
+window instead. Sign one word at a time; to sign a phrase, pause with
 the hands still for about half a second between signs (see `data/phrases.json`).
 Speech needs the internet (Google TTS).
 

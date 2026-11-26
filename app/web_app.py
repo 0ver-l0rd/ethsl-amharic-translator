@@ -15,6 +15,7 @@ videos, without the command line.
                with the current one; "Use this model" switches the live model.
 
 Usage:
+  python app/web                     # the same, after finding the model, in the browser
   python app/web_app.py              # team page: all four tabs
   python app/web_app.py --public     # Translate and Add a video only (for hosting)
 
@@ -419,13 +420,13 @@ def build(public: bool) -> gr.Blocks:
     return page
 
 
-def main():
+def main(open_browser: bool = False):
     parser = argparse.ArgumentParser(description="EthSL translator in the browser")
     parser.add_argument("--public", action="store_true",
                         help="Only Translate and Add a video, and team names aren't recognised")
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args()
-    build(args.public).queue().launch(server_port=args.port, show_api=False,
+    build(args.public).queue().launch(server_port=args.port, show_api=False, inbrowser=open_browser,
                                       allowed_paths=[str(contrib.CONTRIB_DIR)])
 
 

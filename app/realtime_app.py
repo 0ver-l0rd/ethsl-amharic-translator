@@ -20,6 +20,7 @@ Pipeline (per frame):
 Nothing is guessed while the hands are down.
 
 Usage:
+  python app/realtime_app.py          # the live model (found as for app/web)
   python app/realtime_app.py --model models/finetuned/best_model.h5
   python app/realtime_app.py --model models/refined/best_model.h5 --threshold 0.7
 
@@ -53,6 +54,7 @@ from src.landmark_extractor import LandmarkExtractor, face_mode_for_dim
 from src.vocabulary import Vocabulary
 from src.amharic_tts import AmharicTTS
 from src.phrases import phrases_for
+from src.retrain import require_live_model
 from app.ui import SignLanguageUI
 from app.inference_engine import InferenceEngine
 from app.live_session import CONFIDENCE_THRESHOLD, LiveSession
@@ -110,7 +112,8 @@ class LatestFrameReader:
 
 def main():
     parser = argparse.ArgumentParser(description="Real-time EthSL translator")
-    parser.add_argument("--model",     required=True,   help="Path to .h5 model")
+    parser.add_argument("--model",     default=None,
+                        help="Path to .h5 model (default: models/finetuned/best_model.h5)")
     parser.add_argument("--camera",    type=int, default=0, help="Camera device index")
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
                         help="Confidence threshold for accepting a prediction")
@@ -119,6 +122,8 @@ def main():
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
                              "Best if training data was also extracted in lite mode.")
     args = parser.parse_args()
+    if args.model is None:
+        args.model = str(require_live_model())
 
     print("EthSL Real-Time Translator")
     print("=" * 40)

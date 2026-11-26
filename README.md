@@ -142,9 +142,26 @@ ethsl-amharic-translator/
 
 ## Quick Start
 
+### Try the app (team members)
+The trained model is not on GitHub (it is trained on data we may not share),
+so get `best_model.h5` from the team's Telegram group. Then, with Python 3.12:
+```bash
+git clone https://github.com/0ver-l0rd/ethsl-amharic-translator.git
+cd ethsl-amharic-translator
+python3.12 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+mkdir -p models/finetuned          # put best_model.h5 in this folder
+python app/web_app.py              # then open http://127.0.0.1:7860
+```
+`python app/realtime_app.py --model models/finetuned/best_model.h5` opens the
+desktop window instead. Sign one word at a time; to sign a phrase, pause with
+the hands still for about half a second between signs (see `data/phrases.json`).
+Speech needs the internet (Google TTS).
+
 ### 1. Clone and set up
 ```bash
-git clone https://github.com/YOUR_USERNAME/ethsl-amharic-translator.git
+git clone https://github.com/0ver-l0rd/ethsl-amharic-translator.git
 cd ethsl-amharic-translator
 pip install -r requirements.txt
 ```

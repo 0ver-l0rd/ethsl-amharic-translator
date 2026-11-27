@@ -57,7 +57,7 @@ from src.phrases import phrases_for
 from src.retrain import require_live_model
 from app.ui import SignLanguageUI
 from app.inference_engine import InferenceEngine
-from app.live_session import CONFIDENCE_THRESHOLD, LiveSession
+from app.live_session import LiveSession
 
 
 SEQUENCE_LENGTH     = 30
@@ -115,8 +115,9 @@ def main():
     parser.add_argument("--model",     default=None,
                         help="Path to .h5 model (default: models/finetuned/best_model.h5)")
     parser.add_argument("--camera",    type=int, default=0, help="Camera device index")
-    parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
-                        help="Confidence threshold for accepting a prediction")
+    parser.add_argument("--threshold", type=float, default=None,
+                        help="Confidence threshold for accepting a prediction "
+                             "(default: 0.65 for one model, 0.43 for an ensemble)")
     parser.add_argument("--no_speech", action="store_true", help="Disable TTS output")
     parser.add_argument("--lite", action="store_true",
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
@@ -129,13 +130,13 @@ def main():
     print("=" * 40)
     print(f"Model:     {args.model}")
     print(f"Camera:    {args.camera}")
-    print(f"Threshold: {args.threshold}")
     print(f"Speech:    {'OFF' if args.no_speech else 'ON'}")
     print(f"MediaPipe: {'lite' if args.lite else 'full'}")
 
     # Initialize components
     vocab    = Vocabulary(str(VOCAB_PATH))
     engine   = InferenceEngine(args.model, vocab, args.threshold)
+    print(f"Threshold: {engine.threshold:.2f}")
 
     # The model's input size says which face landmarks it was trained with
     feature_dim = engine.model.input_shape[-1]
@@ -149,7 +150,7 @@ def main():
 
     phrases  = phrases_for(vocab)
     print(f"Phrases: {len(phrases)}")
-    session  = LiveSession(engine, args.threshold, SEQUENCE_LENGTH, phrases)
+    session  = LiveSession(engine, engine.threshold, SEQUENCE_LENGTH, phrases)
     tts      = AmharicTTS() if not args.no_speech else None
     ui       = SignLanguageUI(vocab)
     speech_enabled = not args.no_speech

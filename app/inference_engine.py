@@ -3,8 +3,10 @@ app/inference_engine.py
 =======================
 Loads the trained sign model and turns one landmark sequence (30 frames x 258
 features) into a guess: the sign's label, its Amharic word and the model's
-confidence. A guess below the confidence threshold (0.65 by default) is
-returned as None. Used by both the web app and the desktop app.
+confidence. A guess below the confidence threshold is returned as None. The
+threshold suits the model unless one is given: 0.65 for one model, 0.43 for
+an ensemble of several (src/ensemble.py), whose averaged probabilities are
+less extreme. Used by both the web app and the desktop app.
 
 The model runs through fast_predictor, a compiled function that is faster
 than model.predict for one sequence at a time, and is warmed up when loaded
@@ -25,6 +27,7 @@ except ImportError:
     sys.exit(1)
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.ensemble import default_threshold, members
 from src.sequence_builder import SequenceBuilder
 # Importing model_architectures registers the Transformer's custom layers,
 # which load_model needs to deserialize a saved Transformer.
@@ -41,18 +44,23 @@ class InferenceEngine:
         Path to the saved .h5 model.
     vocab : Vocabulary
         Vocabulary object for label lookup.
-    confidence_threshold : float
-        Minimum softmax probability to report a prediction.
+    confidence_threshold : float or None
+        Minimum probability to report a prediction (None: the model's default,
+        see src/ensemble.py).
     """
 
-    def __init__(self, model_path: str, vocab, confidence_threshold: float = 0.65):
+    def __init__(self, model_path: str, vocab, confidence_threshold: Optional[float] = None):
         self.vocab      = vocab
-        self.threshold  = confidence_threshold
 
         print(f"Loading model: {model_path}")
         self.model = keras.models.load_model(model_path)
         self.model.summary()
         self._infer = fast_predictor(self.model)
+        self.members = len(members(self.model))
+        self.threshold = (default_threshold(self.model) if confidence_threshold is None
+                          else confidence_threshold)
+        if self.members > 1:
+            print(f"Ensemble of {self.members} models; confidence threshold {self.threshold:.2f}")
 
         # Warm up (first call is slower due to graph compilation)
         _, seq_len, feat_dim = self.model.input_shape

@@ -7,7 +7,8 @@ app (app/realtime_app.py) and the web page (app/web_app.py):
   - the sign spotter (src/sign_spotter.py) finds where each sign starts and
     ends; nothing is guessed while the hands are down
   - after each sign the model classifies it once; below the confidence
-    threshold it says "Not sure" instead of guessing
+    threshold it says "Not sure" instead of guessing (the engine's threshold
+    by default: 0.65 for one model, 0.43 for an ensemble)
   - words signed one after another can make a phrase (src/phrases.py):
     እንዴት + አንተ -> "እንዴት ነህ?". Only the phrase is said: a word that could
     start one is shown at once but said only if no sign follows within
@@ -25,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.phrases import Phrase, PhraseBuilder
 from src.sign_spotter import SignSpotter, Status
 
-CONFIDENCE_THRESHOLD = 0.65   # minimum confidence to accept a prediction
+CONFIDENCE_THRESHOLD = 0.65   # minimum confidence to accept a prediction, if the engine has none
 MESSAGE_SECONDS      = 2.5    # how long a notice like "Not sure" stays up
 HISTORY_LENGTH       = 20
 SAY_WAIT             = 1.5    # s with no new sign before a word that could start a phrase is said
@@ -39,10 +40,10 @@ class LiveSession:
     sentences; without it every word stands alone.
     """
 
-    def __init__(self, engine, threshold: float = CONFIDENCE_THRESHOLD, sequence_length: int = 30,
+    def __init__(self, engine, threshold: Optional[float] = None, sequence_length: int = 30,
                  phrases: Optional[List[Phrase]] = None):
         self.engine = engine
-        self.threshold = threshold
+        self.threshold = threshold if threshold is not None else getattr(engine, "threshold", CONFIDENCE_THRESHOLD)
         self.spotter = SignSpotter(sequence_length=sequence_length)
         self.builder = PhraseBuilder(phrases or [])
         self.label = ""

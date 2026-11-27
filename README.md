@@ -227,6 +227,10 @@ word or more examples of one:
   Only approved clips reach `data/landmarks/`; rejected ones are deleted.
 - **Retrain** (team): trains a new model into `models/candidate/` and shows its
   scores next to the current one; **Use this model** makes the live app use it.
+  The model is five networks trained side by side with different seeds and
+  saved as one `best_model.h5` that averages them (about 30 minutes): 79.7%
+  instead of 73.4% on signers it never saw. It uses a "Not sure" threshold of
+  0.43 instead of 0.65, so pull the latest code before using a new model.
 
 Contributors are stored as `c01`, `c02`, ...; the table of their names stays
 in `data/contributions/`, which is never committed.

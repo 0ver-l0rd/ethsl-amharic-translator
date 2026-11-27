@@ -297,6 +297,7 @@ def scores_table():
     rows = [("Accuracy on the test signer (never trained on)", "unseen_signer"),
             ("Accuracy on signers it trained on", "seen_signers"),
             ("Test signer", "test_signer"), ("Words", "words"), ("Clips", "clips"),
+            ("Models averaged", "models"),
             ("Trained", "trained")]
     md = "| | Current model | New model |\n|---|---|---|\n"
     md += "\n".join(f"| {name} | {fmt(cur, k)} | {fmt(new, k)} |" for name, k in rows)

@@ -18,7 +18,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Iterator, Optional
+from typing import Dict, Iterable, Iterator, Optional, Tuple
 
 import numpy as np
 import yaml
@@ -28,6 +28,39 @@ CANDIDATE_DIR = ROOT / "models" / "candidate"
 LIVE_DIR = ROOT / "models" / "finetuned"
 PRETRAINED = ROOT / "models" / "pretrained" / "islr_lstm.h5"
 TEST_SIGNERS = ["s04", "g07"]   # first one present in the data is held out
+# Where a model sent over Telegram ends up: Downloads (or a folder in it) or the repo folder
+MODEL_SEARCH = [Path.home() / "Downloads", ROOT]
+
+
+def find_live_model(live_dir: Path = LIVE_DIR, search: Iterable[Path] = MODEL_SEARCH
+                    ) -> Tuple[Optional[Path], Optional[Path]]:
+    """
+    The live model, live_dir/best_model.h5, as (path, copied_from). If it is
+    missing, the newest best_model*.h5 found in `search` (or a folder just
+    inside one) is copied there first. (None, None) if there is none.
+    """
+    live = live_dir / "best_model.h5"
+    if live.exists():
+        return live, None
+    found = [p for folder in search for pattern in ("best_model*.h5", "*/best_model*.h5")
+             for p in Path(folder).glob(pattern) if p.is_file()]
+    if not found:
+        return None, None
+    newest = max(found, key=lambda p: p.stat().st_mtime)
+    live_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(newest, live)
+    return live, newest
+
+
+def require_live_model() -> Path:
+    """find_live_model() for the apps: says what it did, or how to get a model, and stops."""
+    model, copied_from = find_live_model()
+    if model is None:
+        sys.exit("No model found. Get best_model.h5 from the team's Telegram group and put it in\n"
+                 f"  {LIVE_DIR}\n(or just leave it in Downloads), then run this again.")
+    if copied_from:
+        print(f"Copied the model from {copied_from}\n  to {model}")
+    return model
 
 
 def holdout_signer(signer_ids_path: Path = ROOT / "data" / "processed" / "signer_ids.npy") -> str:

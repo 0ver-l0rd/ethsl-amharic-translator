@@ -1,0 +1,31 @@
+{
+  "about": "Demo phrase table: signs signed one after another become an Amharic sentence. 'signs' are Amharic words from vocabulary.json; they may come in any order, as EthSL word order is not settled for these phrases. The longest matching phrase wins.",
+  "phrases": [
+    {"signs": ["እንዴት", "አንተ"],            "amharic": "እንዴት ነህ?",               "english": "How are you?"},
+    {"signs": ["ሰላም", "አንተ"],             "amharic": "ሰላም ነህ?",                "english": "Are you well?"},
+    {"signs": ["እኔ", "ደህና"],              "amharic": "ደህና ነኝ",                 "english": "I am fine"},
+    {"signs": ["እኔ", "ጥሩ"],               "amharic": "ጥሩ ነኝ",                  "english": "I am good"},
+    {"signs": ["እኔ", "ደህና", "ምስጋና"],      "amharic": "ደህና ነኝ፣ አመሰግናለሁ",       "english": "I am fine, thank you"},
+    {"signs": ["አንተ", "ስም"],              "amharic": "ስምህ ማን ነው?",             "english": "What is your name?"},
+    {"signs": ["አንተ", "ስም", "ምን"],         "amharic": "ስምህ ማን ነው?",             "english": "What is your name?"},
+    {"signs": ["እኔ", "ተማሪ"],              "amharic": "ተማሪ ነኝ",                 "english": "I am a student"},
+    {"signs": ["እኔ", "አስተማሪ"],            "amharic": "አስተማሪ ነኝ",               "english": "I am a teacher"},
+    {"signs": ["እኔ", "ውሃ", "መፈለግ"],       "amharic": "ውሃ እፈልጋለሁ",              "english": "I want water"},
+    {"signs": ["እኔ", "ምግብ", "መፈለግ"],      "amharic": "ምግብ እፈልጋለሁ",             "english": "I want food"},
+    {"signs": ["እኔ", "መብላት", "መፈለግ"],     "amharic": "መብላት እፈልጋለሁ",            "english": "I want to eat"},
+    {"signs": ["እኔ", "መድሃኒት", "መፈለግ"],    "amharic": "መድሃኒት እፈልጋለሁ",           "english": "I need medicine"},
+    {"signs": ["እኔ", "መርዳት", "መፈለግ"],     "amharic": "እርዳታ እፈልጋለሁ",            "english": "I need help"},
+    {"signs": ["አንተ", "ምን", "መፈለግ"],      "amharic": "ምን ትፈልጋለህ?",             "english": "What do you want?"},
+    {"signs": ["እኔ", "ማወቅ", "አይደለም"],     "amharic": "አላውቅም",                  "english": "I don't know"},
+    {"signs": ["እኔ", "ቤት", "መሄድ"],        "amharic": "ወደ ቤት እሄዳለሁ",            "english": "I am going home"},
+    {"signs": ["እኔ", "ሆስፒታል", "መሄድ"],     "amharic": "ወደ ሆስፒታል እሄዳለሁ",         "english": "I am going to the hospital"},
+    {"signs": ["እኔ", "ትምህርት ቤት", "መሄድ"],  "amharic": "ወደ ትምህርት ቤት እሄዳለሁ",      "english": "I am going to school"},
+    {"signs": ["እኔ", "ገበያ", "መሄድ"],       "amharic": "ወደ ገበያ እሄዳለሁ",           "english": "I am going to the market"},
+    {"signs": ["አንተ", "የት", "መሄድ"],       "amharic": "የት ትሄዳለህ?",              "english": "Where are you going?"},
+    {"signs": ["ሆስፒታል", "የት"],            "amharic": "ሆስፒታሉ የት ነው?",           "english": "Where is the hospital?"},
+    {"signs": ["አንተ", "ቤት", "የት"],        "amharic": "ቤትህ የት ነው?",             "english": "Where is your home?"},
+    {"signs": ["ገንዘብ", "ስንት"],            "amharic": "ስንት ብር ነው?",             "english": "How much is it?"},
+    {"signs": ["እኔ", "ነገ", "መምጣት"],       "amharic": "ነገ እመጣለሁ",               "english": "I will come tomorrow"},
+    {"signs": ["ዛሬ", "ጥሩ", "ቀን"],         "amharic": "ዛሬ ጥሩ ቀን ነው",            "english": "Today is a good day"}
+  ]
+}

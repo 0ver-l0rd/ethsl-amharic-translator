@@ -16,7 +16,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from src.sign_spotter import MAX_SIGN, SignSpotter, Status
-from tests.test_split_recording import track
+from tests.test_split_recording import hands_up_track, track
 
 FPS = 15   # the live app runs slower than the camera
 
@@ -107,3 +107,35 @@ def test_slow_sign_gets_a_longer_window_with_rest_on_both_sides():
     assert 5.2 + 0.3 < events[0][0] < 5.2 + 0.5
     hand = np.abs(events[0][1].sequence[:, 132 + 63:]).sum(1) > 0
     assert not hand[0] and not hand[-1]             # the whole sign is inside
+
+
+def run_up(segments, up, duration, lowering=None):
+    """Like run(), for a signer who keeps the hand up and only pauses between signs."""
+    times, kp = hands_up_track(segments, up=up, duration=duration, fps=FPS, lowering=lowering)
+    spotter, events = SignSpotter(), []
+    for t, k in zip(times, kp):
+        if (e := spotter.add_frame(float(t), k)):
+            events.append((float(t), e))
+    return events
+
+
+def test_signs_with_the_hands_kept_up_are_split_at_pauses():
+    # two signs, a still pause between them, hand lowered only at the end
+    events = run_up([(1.5, 2.5), (3.2, 4.2)], up=(1.0, 5.5), duration=8.0)
+    assert [e.kind for _, e in events] == ["sign", "sign"]
+    assert events[0][0] < 3.2 + 0.5        # the first is guessed before the second is over
+
+
+def test_long_phrase_with_pauses_is_not_too_long():
+    events = run_up([(1.3, 2.3), (2.9, 3.9), (4.5, 5.5), (6.1, 7.1)], up=(1.0, 8.0), duration=10.0)
+    assert [e.kind for _, e in events] == ["sign"] * 4
+
+
+def test_lowering_after_a_pause_is_not_a_sign():
+    events = run_up([(1.5, 2.5)], up=(1.0, 4.0), duration=6.0, lowering=(3.75, 4.0))
+    assert [e.kind for _, e in events] == ["sign"]
+
+
+def test_moving_without_pausing_is_still_too_long():
+    events = run_up([(1.0, 1.0 + MAX_SIGN + 2)], up=(1.0, MAX_SIGN + 4), duration=MAX_SIGN + 6)
+    assert [e.kind for _, e in events] == ["too_long"]

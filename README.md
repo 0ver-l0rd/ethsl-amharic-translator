@@ -53,6 +53,7 @@ ethsl-amharic-translator/
 |   |-- landmarks/              # Extracted MediaPipe landmark arrays (.npy)
 |   |-- processed/              # Normalized, fixed-length sequences
 |   |-- vocabulary.json         # Sign label <=> Amharic text mapping
+|   |-- phrases.json            # Demo phrases: signs in a row -> an Amharic sentence
 |   `-- splits/                 # train / val / test split indices
 |
 |-- scripts/
@@ -141,9 +142,27 @@ ethsl-amharic-translator/
 
 ## Quick Start
 
+### Try the app (team members)
+The trained model is not on GitHub (it is trained on data we may not share),
+so get `best_model.h5` from the team's Telegram group. Then, with Python 3.12:
+```bash
+git clone https://github.com/0ver-l0rd/ethsl-amharic-translator.git
+cd ethsl-amharic-translator
+python3.12 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python app/web                     # opens the app in the browser
+```
+The app finds the model itself: it uses `models/finetuned/best_model.h5`, and
+if that is missing it copies the newest `best_model.h5` from Downloads (where
+Telegram saves it) into place. `python app/realtime_app.py` opens the desktop
+window instead. Sign one word at a time; to sign a phrase, pause with
+the hands still for about half a second between signs (see `data/phrases.json`).
+Speech needs the internet (Google TTS).
+
 ### 1. Clone and set up
 ```bash
-git clone https://github.com/YOUR_USERNAME/ethsl-amharic-translator.git
+git clone https://github.com/0ver-l0rd/ethsl-amharic-translator.git
 cd ethsl-amharic-translator
 pip install -r requirements.txt
 ```
@@ -265,7 +284,11 @@ python app/web_app.py --public   # Translate and Add a video only (for hosting)
 
 Both guess once per sign: a sign starts when the hands come up and ends when
 they are lowered, and below 65% confidence the app says "Not sure" instead of
-guessing. The browser version also has tabs for adding training videos,
+guessing. Signs made one after another can form a phrase from
+`data/phrases.json` (እንዴት + አንተ -> "እንዴት ነህ?"); the signs may come in
+either order, each within 6 seconds of the one before, and the hands may stay
+up if they pause between signs. Only the phrase is said: a word that could
+start one is shown at once, but said only if no sign follows within 1.5 s. The browser version also has tabs for adding training videos,
 reviewing them, and retraining.
 
 ---
@@ -302,7 +325,7 @@ See `module2_finetune/README.md` for full details.
 ## Vocabulary
 
 The system targets **50-100 common EthSL signs**. `data/vocabulary.json` has
-71 words: the 15 from the Gonfa et al. dataset (written first by
+75 words: the 15 from the Gonfa et al. dataset (written first by
 `scripts/convert_gonfa.py`, which keeps the words after them), then the team's
 own recordings. The team records the 65 words in `data/our_words.tsv`: 60
 everyday words and 5 that are also in the Gonfa data:

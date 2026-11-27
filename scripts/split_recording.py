@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.clip_naming import clip_filename, next_clip_index, parse_signer, validate_signer_id
 from src.landmark_layout import LEFT_SHOULDER, RIGHT_SHOULDER, POSE_DIMS, body_relative
 from src.sequence_builder import SIGN_WINDOW_SECONDS, sign_window
-from src.sign_spotter import activity_signal, HAND_DIMS, LEFT_WRIST, RIGHT_WRIST   # shared with the live app
+from src.sign_spotter import activity_signal, hand_speed, HAND_DIMS, LEFT_WRIST, RIGHT_WRIST   # shared with the live app
 from src.video_io import open_clip_writer
 
 OUTPUT_DIR = Path(__file__).parent.parent / "data" / "landmarks"
@@ -75,7 +75,6 @@ STOP_REACH_HANDS = 0.5  # below this share of frames with a hand detected
 STOP_REACH_LEN   = 2.5  # s; longer stretches hold a real sign
 EDGE_TOLERANCE   = 0.05 # s; a rep this close to the start or end of the video was cut off
 # --by_motion: signers who keep their hands up and only pause between reps
-MOTION_SMOOTH    = 0.25 # s; hand speed is averaged over this long
 MOTION_EDGE      = 0.1  # s; a burst this close to the hands coming up / going down ...
 MOTION_SHORT     = 0.6  # ... and shorter than this x the typical burst is raising / lowering them
 MOTION_MIN_PAUSE = 0.35 # s; shorter still moments are inside one sign
@@ -145,29 +144,6 @@ def find_repetitions(
         else:
             merged.append([a, b])
     return [(float(times[a]), float(times[b])) for a, b in merged if times[b] - times[a] >= min_sign]
-
-
-def hand_speed(times: np.ndarray, keypoints: np.ndarray, smooth: float = MOTION_SMOOTH) -> np.ndarray:
-    """
-    How fast the hands move in each frame (shoulder widths per second, smoothed
-    over `smooth` seconds): the fastest of the two wrists and the two hands'
-    points, measured relative to the body. Points not found count as still.
-    """
-    rel = body_relative(keypoints)
-    parts = [rel[:, [w * 4, w * 4 + 1]] for w in (LEFT_WRIST, RIGHT_WRIST)]
-    for first in (POSE_DIMS, POSE_DIMS + HAND_DIMS):
-        parts.append(rel[:, first:first + HAND_DIMS].reshape(len(rel), -1, 3)[..., :2].reshape(len(rel), -1))
-    dt = np.diff(times)
-    speed = np.zeros(len(rel))
-    for p in parts:
-        found = (p != 0).any(axis=1)
-        both = found[1:] & found[:-1]
-        step = np.linalg.norm((p[1:] - p[:-1]).reshape(len(dt), -1, 2), axis=2).mean(axis=1)
-        moved = np.zeros(len(rel))
-        moved[1:][both] = step[both] / np.maximum(dt[both], 1e-6)
-        speed = np.maximum(speed, moved)
-    k = max(1, int(round(smooth / np.median(dt)))) if len(dt) else 1
-    return np.convolve(speed, np.ones(k) / k, mode="same")
 
 
 def motion_bursts(times: np.ndarray, keypoints: np.ndarray, level: float,

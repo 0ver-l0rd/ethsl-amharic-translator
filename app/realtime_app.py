@@ -12,11 +12,15 @@ Pipeline (per frame):
      30 frames (cut the same way as the training clips) and classify it once
   5. Display the sign (Amharic text) with its confidence, or "Not sure" if
      the confidence is below the threshold
-  6. Synthesize Amharic speech for recognised signs
+  6. Signs in a row that make a phrase in data/phrases.json are shown and
+     said as that sentence (እንዴት + አንተ -> "እንዴት ነህ?"); a word that could
+     start a phrase is said only if no sign follows
+  7. Synthesize Amharic speech for recognised signs
 
 Nothing is guessed while the hands are down.
 
 Usage:
+  python app/realtime_app.py          # the live model (found as for app/web)
   python app/realtime_app.py --model models/finetuned/best_model.h5
   python app/realtime_app.py --model models/refined/best_model.h5 --threshold 0.7
 
@@ -49,6 +53,8 @@ except ImportError:
 from src.landmark_extractor import LandmarkExtractor, face_mode_for_dim
 from src.vocabulary import Vocabulary
 from src.amharic_tts import AmharicTTS
+from src.phrases import phrases_for
+from src.retrain import require_live_model
 from app.ui import SignLanguageUI
 from app.inference_engine import InferenceEngine
 from app.live_session import CONFIDENCE_THRESHOLD, LiveSession
@@ -106,7 +112,8 @@ class LatestFrameReader:
 
 def main():
     parser = argparse.ArgumentParser(description="Real-time EthSL translator")
-    parser.add_argument("--model",     required=True,   help="Path to .h5 model")
+    parser.add_argument("--model",     default=None,
+                        help="Path to .h5 model (default: models/finetuned/best_model.h5)")
     parser.add_argument("--camera",    type=int, default=0, help="Camera device index")
     parser.add_argument("--threshold", type=float, default=CONFIDENCE_THRESHOLD,
                         help="Confidence threshold for accepting a prediction")
@@ -115,6 +122,8 @@ def main():
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
                              "Best if training data was also extracted in lite mode.")
     args = parser.parse_args()
+    if args.model is None:
+        args.model = str(require_live_model())
 
     print("EthSL Real-Time Translator")
     print("=" * 40)
@@ -138,7 +147,9 @@ def main():
     print(f"Face mode: {face_mode} ({feature_dim} features, from the model)")
     print()
 
-    session  = LiveSession(engine, args.threshold, SEQUENCE_LENGTH)
+    phrases  = phrases_for(vocab)
+    print(f"Phrases: {len(phrases)}")
+    session  = LiveSession(engine, args.threshold, SEQUENCE_LENGTH, phrases)
     tts      = AmharicTTS() if not args.no_speech else None
     ui       = SignLanguageUI(vocab)
     speech_enabled = not args.no_speech
@@ -172,16 +183,16 @@ def main():
 
             # Extract landmarks
             keypoints, results = extractor.process_frame(frame)
-            recognised = session.update(t_captured, keypoints)
+            to_say = session.update(t_captured, keypoints)
 
             # Draw landmarks
             frame = extractor.draw_landmarks(frame, results)
 
-            if recognised:
-                print(f"{recognised}  ({session.label}, {session.confidence:.0%})")
+            if to_say:
+                print(to_say)
                 if speech_enabled and tts:
                     tts.reset()          # each sign is new, so say repeats too
-                    tts.speak(recognised)
+                    tts.speak(to_say)
 
             # FPS tracking
             fps_counter.append(time.perf_counter() - t0)
@@ -193,9 +204,9 @@ def main():
                 status=session.status,
                 message=session.message,
                 current_label=session.label,
-                current_amharic=session.amharic,
+                current_amharic=session.phrase.amharic if session.phrase else session.amharic,
                 confidence=session.confidence,
-                sentence_history=session.history[-5:],  # last 5 signs
+                sentence_history=session.history[-5:],  # last 5 words or phrases
                 fps=fps,
                 speech_enabled=speech_enabled,
             )

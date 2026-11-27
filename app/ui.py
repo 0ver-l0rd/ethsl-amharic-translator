@@ -202,7 +202,8 @@ class SignLanguageUI:
         status : Status  what the sign spotter is doing
         message : str  a short notice shown instead of the status (e.g. "Not sure"),
             or "" for none
-        current_label, current_amharic : the last recognised sign ("" for none yet)
+        current_label, current_amharic : the last recognised sign ("" for none yet);
+            current_amharic is the phrase instead when that sign completed one
         confidence : float  (0-1) of the last recognised sign
         sentence_history : list of Amharic strings
         fps : float
@@ -238,8 +239,9 @@ class SignLanguageUI:
         pred_y = H - 125
         draw_rounded_rect(frame, (0, pred_y), (W, H), COLORS["panel_bg"], radius=0, alpha=0.80)
         if current_label:
+            # a phrase can be several words long: smaller, so it fits
             put_unicode_text(frame, current_amharic, (12, pred_y + 48),
-                             size_px=44, color=COLORS["white"])
+                             size_px=44 if len(current_amharic) <= 10 else 30, color=COLORS["white"])
             put_text_shadow(frame, current_label.replace("_", " "),
                             (W - 190, pred_y + 40), scale=0.6, color=COLORS["gray"], thickness=1)
 

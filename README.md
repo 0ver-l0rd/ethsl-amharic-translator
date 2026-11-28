@@ -287,8 +287,9 @@ python app/web_app.py --public   # Translate and Add a video only (for hosting)
 ```
 
 Both guess once per sign: a sign starts when the hands come up and ends when
-they are lowered, and below 65% confidence the app says "Not sure" instead of
-guessing. Signs made one after another can form a phrase from
+they are lowered. Below the confidence threshold (0.43 for the live
+five-model file, 0.65 for a single model) the app says "Not sure" instead of
+guessing and names its three best guesses. Signs made one after another can form a phrase from
 `data/phrases.json` (እንዴት + አንተ -> "እንዴት ነህ?"); the signs may come in
 either order, each within 6 seconds of the one before, and the hands may stay
 up if they pause between signs. Only the phrase is said: a word that could

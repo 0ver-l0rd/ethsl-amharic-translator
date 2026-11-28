@@ -21,6 +21,8 @@ data/landmarks/
 # Uploaded videos and the name -> signer ID table: personal data, never commit
 data/contributions/
 data/processed/
+# Speech made by gTTS for the words and phrases (scripts/prepare_speech.py)
+data/speech/
 
 # Trained model weights (store in releases or DVC)
 models/refined/*.h5

@@ -29,6 +29,7 @@ Keyboard controls:
   r     : Reset (drop the sign in progress and the last word)
   s     : Toggle speech output on/off
   c     : Clear the sentence history
+  w     : Show or hide the words the model knows
 """
 
 import cv2
@@ -52,7 +53,7 @@ except ImportError:
 
 from src.landmark_extractor import LandmarkExtractor, face_mode_for_dim
 from src.vocabulary import Vocabulary
-from src.amharic_tts import AmharicTTS
+from src.amharic_tts import AmharicTTS, speech_texts
 from src.phrases import phrases_for
 from src.retrain import require_live_model
 from app.ui import SignLanguageUI
@@ -117,7 +118,7 @@ def main():
     parser.add_argument("--camera",    type=int, default=0, help="Camera device index")
     parser.add_argument("--threshold", type=float, default=None,
                         help="Confidence threshold for accepting a prediction "
-                             "(default: 0.65 for one model, 0.43 for an ensemble)")
+                             "(default: 0.65 for one model, 0.445 for an ensemble)")
     parser.add_argument("--no_speech", action="store_true", help="Disable TTS output")
     parser.add_argument("--lite", action="store_true",
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
@@ -152,8 +153,11 @@ def main():
     print(f"Phrases: {len(phrases)}")
     session  = LiveSession(engine, engine.threshold, SEQUENCE_LENGTH, phrases)
     tts      = AmharicTTS() if not args.no_speech else None
+    if tts:
+        tts.prepare_in_background(speech_texts(vocab, phrases))   # so speech works offline later
     ui       = SignLanguageUI(vocab)
     speech_enabled = not args.no_speech
+    show_words = False
 
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
@@ -166,7 +170,7 @@ def main():
     reader = LatestFrameReader(cap)
     frame_seq = 0
 
-    print("Press 'q' to quit | 'r' to reset | 's' to toggle speech")
+    print("Press 'q' to quit | 'r' to reset | 's' to toggle speech | 'w' for the word list")
     print()
 
     fps_counter = deque(maxlen=30)
@@ -210,6 +214,7 @@ def main():
                 sentence_history=session.history[-5:],  # last 5 words or phrases
                 fps=fps,
                 speech_enabled=speech_enabled,
+                show_words=show_words,
             )
 
             cv2.imshow("EthSL Amharic Translator", frame)
@@ -223,6 +228,8 @@ def main():
             elif key == ord("s"):
                 speech_enabled = not speech_enabled
                 print(f"Speech: {'ON' if speech_enabled else 'OFF'}")
+            elif key == ord("w"):
+                show_words = not show_words
             elif key == ord("c"):
                 session.clear_history()
                 print("Sentence history cleared.")

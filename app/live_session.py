@@ -7,8 +7,10 @@ app (app/realtime_app.py) and the web page (app/web_app.py):
   - the sign spotter (src/sign_spotter.py) finds where each sign starts and
     ends; nothing is guessed while the hands are down
   - after each sign the model classifies it once; below the confidence
-    threshold it says "Not sure" instead of guessing (the engine's threshold
-    by default: 0.65 for one model, 0.43 for an ensemble)
+    threshold it says "Not sure" instead of guessing, and names its three
+    best guesses ("Not sure - maybe እንዴት, የት or ምን?"): the right word is among
+    them for 93% of a new person's signs (the engine's threshold by
+    default: 0.65 for one model, 0.445 for an ensemble)
   - words signed one after another can make a phrase (src/phrases.py):
     እንዴት + አንተ -> "እንዴት ነህ?". Only the phrase is said: a word that could
     start one is shown at once but said only if no sign follows within
@@ -27,15 +29,25 @@ from src.phrases import Phrase, PhraseBuilder
 from src.sign_spotter import SignSpotter, Status
 
 CONFIDENCE_THRESHOLD = 0.65   # minimum confidence to accept a prediction, if the engine has none
-MESSAGE_SECONDS      = 2.5    # how long a notice like "Not sure" stays up
+MESSAGE_SECONDS      = 2.5    # how long a notice like "Pause between signs" stays up
+UNSURE_SECONDS       = 4.0    # "Not sure" with three guesses stays longer, to be read
+GUESSES              = 3      # best guesses named when not sure
 HISTORY_LENGTH       = 20
 SAY_WAIT             = 1.5    # s with no new sign before a word that could start a phrase is said
+
+
+def unsure_text(guesses: List[str]) -> str:
+    """'Not sure - maybe A, B or C?' for the best guesses, best first."""
+    names = list(dict.fromkeys(guesses))
+    maybe = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " or " + names[-1]
+    return f"Not sure - maybe {maybe}?"
 
 
 class LiveSession:
     """
     One person's live translation. `engine` needs best_guess(sequence) ->
-    (label, amharic, confidence), like app.inference_engine.InferenceEngine.
+    (label, amharic, confidence), like app.inference_engine.InferenceEngine;
+    with predict_top_k(sequence, k) too, "Not sure" names its best guesses.
     `phrases` (from src.phrases.load_phrases) turns sign sequences into
     sentences; without it every word stands alone.
     """
@@ -51,6 +63,7 @@ class LiveSession:
         self.confidence = 0.0
         self.phrase: Optional[Phrase] = None   # the phrase the last word completed
         self.message = ""
+        self.guesses: List[str] = []           # best guesses (Amharic) of the last unsure sign
         self._message_until = 0.0
         self._said = 0                # number of the last word said (PhraseBuilder.last_seq)
         self._last_busy = 0.0         # last time a sign was recognised or under way
@@ -68,14 +81,16 @@ class LiveSession:
         if self.status in (Status.SIGNING, Status.RECOGNISING):
             self._last_busy = t
         if event and event.kind == "sign":
-            label, amharic, confidence = self.engine.best_guess(event.sequence)
+            top = self._top_guesses(event.sequence)
+            label, amharic, confidence = top[0]
             if confidence >= self.threshold:
                 self.label, self.amharic, self.confidence = label, amharic, confidence
                 self.phrase = self.builder.add(amharic, t)
-                self.message = ""
+                self.message, self.guesses = "", []
                 self._last_busy = t
             else:
-                self._notice(f"Not sure - try again (maybe {amharic}?)", t)
+                self.guesses = [a for _, a, _ in top]
+                self._notice(unsure_text(self.guesses), t, UNSURE_SECONDS)
         elif event and event.kind == "too_long":
             self._notice("Pause or lower your hands between signs", t)
         if self.message and t > self._message_until:
@@ -102,13 +117,20 @@ class LiveSession:
         """The signs of the current phrase, in the order they were signed."""
         return self.builder.joined if self.phrase else []
 
-    def _notice(self, text: str, t: float) -> None:
-        self.message, self._message_until = text, t + MESSAGE_SECONDS
+    def _top_guesses(self, sequence):
+        """[(label, amharic, confidence), ...], best first: GUESSES of them if the engine can, else one."""
+        if hasattr(self.engine, "predict_top_k"):
+            return list(self.engine.predict_top_k(sequence, GUESSES))
+        return [self.engine.best_guess(sequence)]
+
+    def _notice(self, text: str, t: float, seconds: float = MESSAGE_SECONDS) -> None:
+        self.message, self._message_until = text, t + seconds
 
     def reset(self) -> None:
         """Drop the sign in progress and the last word (the history stays)."""
         self.spotter.reset()
         self.label, self.amharic, self.confidence, self.message = "", "", 0.0, ""
+        self.guesses = []
         self.phrase = None
         self._said = self.builder.last_seq   # an unsaid word is dropped too
 

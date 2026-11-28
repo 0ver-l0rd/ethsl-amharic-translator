@@ -112,6 +112,13 @@ class Vocabulary:
         """Return list of unique category names."""
         return list({s["category"] for s in self._signs})
 
+    def by_category(self) -> Dict[str, List[Dict]]:
+        """The signs grouped by category, in file order: {category: [{label, amharic, description, id}, ...]}."""
+        groups: Dict[str, List[Dict]] = {}
+        for s in self._signs:
+            groups.setdefault(s["category"], []).append(s)
+        return groups
+
     def describe(self, label: str) -> Optional[str]:
         """Return the English description for a sign label."""
         for s in self._signs:

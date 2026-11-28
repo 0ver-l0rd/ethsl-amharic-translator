@@ -228,9 +228,11 @@ word or more examples of one:
 - **Retrain** (team): trains a new model into `models/candidate/` and shows its
   scores next to the current one; **Use this model** makes the live app use it.
   The model is five networks trained side by side with different seeds and
-  saved as one `best_model.h5` that averages them (about 30 minutes): 79.7%
-  instead of 73.4% on signers it never saw. It uses a "Not sure" threshold of
-  0.43 instead of 0.65, so pull the latest code before using a new model.
+  saved as one `best_model.h5` that averages them (about 30 minutes). The app
+  also classifies each sign mirrored and averages the two answers. Together:
+  80.5% instead of 73.4% for one model on signers it never saw. It uses a
+  "Not sure" threshold of 0.445 instead of 0.65, so pull the latest code
+  before using a new model.
 
 Contributors are stored as `c01`, `c02`, ...; the table of their names stays
 in `data/contributions/`, which is never committed.
@@ -287,8 +289,9 @@ python app/web_app.py --public   # Translate and Add a video only (for hosting)
 ```
 
 Both guess once per sign: a sign starts when the hands come up and ends when
-they are lowered, and below 65% confidence the app says "Not sure" instead of
-guessing. Signs made one after another can form a phrase from
+they are lowered. Below the confidence threshold (0.445 for the live
+five-model file, 0.65 for a single model) the app says "Not sure" instead of
+guessing and names its three best guesses. Signs made one after another can form a phrase from
 `data/phrases.json` (እንዴት + አንተ -> "እንዴት ነህ?"); the signs may come in
 either order, each within 6 seconds of the one before, and the hands may stay
 up if they pause between signs. Only the phrase is said: a word that could

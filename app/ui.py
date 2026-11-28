@@ -5,8 +5,9 @@ OpenCV-based display overlay for the real-time EthSL translator.
 
 Renders a HUD showing:
   - A status bar: ready / signing / recognising, or a notice such as
-    "Not sure - try again"
+    "Not sure - maybe ..." with the three best guesses
   - The last recognised sign (large Amharic text) and its confidence
+  - On request (key W), the 75 words it knows, over the camera picture
   - Rolling sentence history
   - FPS counter and speech toggle indicator
 """
@@ -180,6 +181,7 @@ class SignLanguageUI:
 
     def __init__(self, vocab):
         self.vocab = vocab
+        self.words = [vocab.id_to_amharic(i) for i in range(vocab.num_classes)]
 
     def draw(
         self,
@@ -192,6 +194,7 @@ class SignLanguageUI:
         sentence_history: List[str],
         fps: float,
         speech_enabled: bool,
+        show_words: bool = False,
     ) -> np.ndarray:
         """
         Draw the full HUD overlay on the frame.
@@ -208,6 +211,7 @@ class SignLanguageUI:
         sentence_history : list of Amharic strings
         fps : float
         speech_enabled : bool
+        show_words : bool  list the words the model knows over the camera picture
 
         Returns
         -------
@@ -237,6 +241,8 @@ class SignLanguageUI:
 
         # ── Last recognised sign ───────────────────────────────────────
         pred_y = H - 125
+        if show_words:
+            self.draw_word_list(frame, 86, pred_y - 6)
         draw_rounded_rect(frame, (0, pred_y), (W, H), COLORS["panel_bg"], radius=0, alpha=0.80)
         if current_label:
             # a phrase can be several words long: smaller, so it fits
@@ -269,7 +275,34 @@ class SignLanguageUI:
                             (12, pred_y + 70), scale=0.55, color=COLORS["gray"], thickness=1)
 
         # ── Keyboard hints ─────────────────────────────────────────────
-        put_text_shadow(frame, "[Q] Quit  [R] Reset  [S] Speech  [C] Clear history",
+        put_text_shadow(frame, "[Q] Quit  [R] Reset  [S] Speech  [C] Clear history  [W] Words",
                         (10, H - 6), scale=0.4, color=COLORS["gray"], thickness=1)
 
         return frame
+
+    def draw_word_list(self, frame: np.ndarray, y_top: int, y_bottom: int) -> None:
+        """The words the model knows, in columns, on a dark panel between y_top and y_bottom."""
+        H, W = frame.shape[:2]
+        draw_rounded_rect(frame, (6, y_top), (W - 6, y_bottom), COLORS["bg_dark"], radius=8, alpha=0.82)
+        put_text_shadow(frame, f"The {len(self.words)} words it knows (phrases: see the web page)",
+                        (16, y_top + 20), scale=0.45, color=COLORS["accent"], thickness=1)
+        size, line, rows, cols, col_w = self._word_grid(W - 32, y_bottom - y_top - 34)
+        for n, word in enumerate(self.words):
+            r, c = n % rows, n // rows
+            put_unicode_text(frame, word, (16 + c * col_w, y_top + 42 + r * line),
+                             size_px=size, color=COLORS["white"])
+
+    def _word_grid(self, width: int, height: int):
+        """(font size, line height, rows, columns, column width) that fit every word without overlap."""
+        for size in (16, 15, 14, 13, 12, 11):
+            if ETHIOPIC_FONT:
+                longest = max(_load_font(size).getlength(w) for w in self.words)
+            else:
+                longest = max(len(w) for w in self.words) * size * 0.55
+            col_w = int(longest) + 14
+            line = size + 4
+            cols = max(1, width // col_w)
+            rows = -(-len(self.words) // cols)
+            if rows * line <= height:
+                return size, line, rows, cols, width // cols
+        return size, line, rows, cols, width // cols

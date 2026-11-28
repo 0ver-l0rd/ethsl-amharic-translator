@@ -25,7 +25,6 @@ Then open http://127.0.0.1:7860 in a browser.
 import argparse
 import base64
 import sys
-import tempfile
 import threading
 import time
 from collections import Counter
@@ -40,7 +39,7 @@ sys.path.insert(0, str(ROOT))
 from src import contributions as contrib
 from src import retrain
 from src.clip_naming import parse_signer
-from src.amharic_tts import AmharicTTS
+from src.amharic_tts import AmharicTTS, speech_texts
 from src.phrases import phrases_for
 from src.sign_spotter import Status
 from src.vocabulary import LABEL_RE, Vocabulary
@@ -80,7 +79,6 @@ def caption(n, rep):
 
 FRAME_EVERY = 0.07            # s between webcam frames sent to the server (~14 fps)
 IDLE_SECONDS = 120            # a session with no frames for this long is closed
-SPEECH_DIR = Path(tempfile.gettempdir()) / "ethsl_speech"
 
 STATUS_LOOK = {               # text, colour
     Status.NO_BODY:     ("Step into view of the camera", "#6b7280"),
@@ -152,13 +150,32 @@ def word_html(s: LiveSession) -> str:
             f'<div style="margin-top:4px">{pct}% sure</div></div>')
 
 
+def known_html(vocab: Vocabulary, phrases) -> str:
+    """The words and phrases the app knows, for the fold-out list under the camera."""
+    def esc(x):
+        return x.replace("&", "&amp;").replace("<", "&lt;")
+    parts = ['<div style="font-size:.95rem;line-height:1.5">']
+    for category, signs in vocab.by_category().items():
+        items = " &nbsp;·&nbsp; ".join(
+            f'<b style="font-size:1.1rem">{esc(s["amharic"])}</b> <span style="opacity:.7">'
+            f'{esc(s.get("description") or s["label"])}</span>' for s in signs)
+        parts.append(f'<p><span style="text-transform:capitalize;opacity:.6">{esc(category)}:</span> {items}</p>')
+    if phrases:
+        parts.append("<p><b>Phrases</b> (sign the words one after another, in any order):</p><ul>")
+        parts += [f'<li>{esc(" + ".join(p.signs))} → <b>{esc(p.amharic)}</b>'
+                  f'{" <span style=opacity:.7>(" + esc(p.english) + ")</span>" if p.english else ""}</li>'
+                  for p in phrases]
+        parts.append("</ul>")
+    return "".join(parts) + "</div>"
+
+
 def history_md(s: LiveSession) -> str:
     return "**History:** " + ("  ·  ".join(s.history[-10:]) if s.history else "-")
 
 
 def speech_html(word: str) -> str:
     """An autoplaying <audio> with the word's speech inlined (new element each time, so repeats play)."""
-    path = _tts.to_file(word, str(SPEECH_DIR))
+    path = _tts.to_file(word)
     if not path:
         return ""
     data = base64.b64encode(Path(path).read_bytes()).decode()
@@ -359,6 +376,11 @@ def build(public: bool) -> gr.Blocks:
                     speaker = gr.HTML(visible=True, elem_id="speaker")
                     gr.Markdown("Press the camera button to start. Sign one word, then put your hands "
                                 "down; the word appears when you lower them.")
+            known_vocab = Vocabulary(str(contrib.VOCAB_PATH))
+            known = phrases_for(known_vocab)
+            with gr.Accordion(f"Words and phrases it knows ({known_vocab.num_classes} words, "
+                              f"{len(known)} phrases)", open=False):
+                gr.HTML(known_html(known_vocab, known))
             cam.stream(live_frame, [cam, speech], [status, word_box, history, speaker],
                        stream_every=FRAME_EVERY, time_limit=None, concurrency_limit=None,
                        show_progress="hidden")
@@ -427,6 +449,7 @@ def main(open_browser: bool = False):
                         help="Only Translate and Add a video, and team names aren't recognised")
     parser.add_argument("--port", type=int, default=7860)
     args = parser.parse_args()
+    _tts.prepare_in_background(speech_texts())   # so speech works offline later
     build(args.public).queue().launch(server_port=args.port, show_api=False, inbrowser=open_browser,
                                       allowed_paths=[str(contrib.CONTRIB_DIR)])
 

@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app.live_session import LiveSession
+from app.live_session import LiveSession, unsure_text
 from src.sign_spotter import MAX_SIGN
 from tests.test_split_recording import track
 
@@ -52,8 +52,39 @@ def test_confident_sign_is_recognised_once():
 def test_unsure_sign_says_so_instead_of_guessing():
     s, _, words, messages = run(0.4, [(2.0, 3.4)])
     assert words == [] and s.amharic == "" and s.history == []
-    assert messages == {"Not sure - try again (maybe ሰላም?)"}
+    assert messages == {"Not sure - maybe ሰላም?"}
     assert s.message == ""                      # the notice goes away again
+
+
+class TopThreeEngine(FakeEngine):
+    def predict_top_k(self, sequence, k):
+        self.calls += 1
+        return [("endet", "እንዴት", self.confidence), ("yet", "የት", 0.3), ("min", "ምን", 0.1)][:k]
+
+
+def test_unsure_sign_names_the_three_best_guesses():
+    session = LiveSession(TopThreeEngine(0.4))
+    times, kp = track([(2.0, 3.4)], duration=10.0, fps=FPS)
+    messages = set()
+    for t, k in zip(times, kp):
+        session.update(float(t), k)
+        messages.add(session.message)
+    assert "Not sure - maybe እንዴት, የት or ምን?" in messages
+    assert session.history == [] and session.guesses == ["እንዴት", "የት", "ምን"]
+
+
+def test_a_confident_top_guess_is_used_as_before():
+    session = LiveSession(TopThreeEngine(0.9))
+    times, kp = track([(2.0, 3.4)], duration=10.0, fps=FPS)
+    for t, k in zip(times, kp):
+        session.update(float(t), k)
+    assert session.history == ["እንዴት"] and session.guesses == []
+
+
+def test_unsure_text():
+    assert unsure_text(["ሰላም"]) == "Not sure - maybe ሰላም?"
+    assert unsure_text(["ሰላም", "አንተ"]) == "Not sure - maybe ሰላም or አንተ?"
+    assert unsure_text(["ሰላም", "ሰላም", "አንተ"]) == "Not sure - maybe ሰላም or አንተ?"
 
 
 def test_same_word_twice_counts_twice():

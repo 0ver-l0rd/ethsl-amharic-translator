@@ -55,14 +55,14 @@ def test_single_model_keeps_its_threshold():
 
 
 class _Engine:
-    threshold = 0.43
+    threshold = 0.445
 
     def best_guess(self, sequence):
         return "selam", "ሰላም", 0.5
 
 
 def test_live_session_uses_the_engines_threshold():
-    assert LiveSession(_Engine()).threshold == 0.43
+    assert LiveSession(_Engine()).threshold == 0.445
     assert LiveSession(_Engine(), threshold=0.8).threshold == 0.8
     assert LiveSession(None).threshold == CONFIDENCE_THRESHOLD   # an engine without one
 
@@ -88,3 +88,33 @@ def test_each_seed_gets_its_own_config(tmp_path):
     assert cfg["training"]["seed"] == 7
     assert cfg["output"]["model_dir"] == str(tmp_path / "seed_7")
     assert cfg["finetune"]["compare_architectures"] is False
+
+
+def test_mirror_matrix_is_the_mirror():
+    from src.landmark_layout import mirror
+    x = np.random.default_rng(1).normal(size=(30, 258)).astype(np.float32)
+    assert np.allclose(x @ ensemble.mirror_matrix(258), mirror(x))
+
+
+def test_with_mirror_averages_the_sign_and_its_mirror_image():
+    pytest.importorskip("tensorflow")
+    from src.landmark_layout import mirror
+    model = _tiny(5)
+    x = np.random.default_rng(2).normal(size=(3, 30, 258)).astype(np.float32)
+    expected = (model.predict(x, verbose=0)
+                + model.predict(np.stack([mirror(s) for s in x]), verbose=0)) / 2
+    assert np.allclose(ensemble.with_mirror(model).predict(x, verbose=0), expected, atol=1e-6)
+
+
+def test_only_an_ensemble_gets_the_mirrored_copy(tmp_path):
+    pytest.importorskip("tensorflow")
+    from tensorflow import keras
+    single = _tiny(0)
+    paths = []
+    for seed in (1, 2):
+        _tiny(seed).save(str(tmp_path / f"m{seed}.h5"))
+        paths.append(tmp_path / f"m{seed}.h5")
+    ensemble.combine_files(paths, tmp_path / "ens.h5")
+    ens = keras.models.load_model(str(tmp_path / "ens.h5"), compile=False)
+    assert ensemble.uses_mirror(ens) and not ensemble.uses_mirror(single)
+

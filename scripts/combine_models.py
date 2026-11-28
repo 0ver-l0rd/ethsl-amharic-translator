@@ -10,6 +10,8 @@ the way finetune.py scores one model:
   - signer-independent accuracy: the average of every member's model trained
     without the held-out signer (<member>/lstm/signer_independent/best.keras),
     on that signer's clips
+  - both scored as the app uses them: each model also on the mirrored sign
+    (src/ensemble.with_mirror)
   - <out>/all_results.json in finetune.py's format, so retrain.scores() reads it
 
 Usage (src/retrain.py runs it):
@@ -28,7 +30,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "module2_finetune"))
 
-from src.ensemble import combine, combine_files
+from src.ensemble import combine, combine_files, with_mirror
 from src.vocabulary import Vocabulary
 
 
@@ -57,20 +59,21 @@ def main():
     results = {"architecture": f"lstm x{len(members)} (ensemble)", "members": len(members),
                "member_folders": [m.name for m in members]}
     test = np.load(splits / "test_idx.npy")
-    results["signer_dependent"] = evaluate_model(live, X[test], y[test], labels, "Signer-Dependent")
+    results["mirrored_copy"] = True
+    results["signer_dependent"] = evaluate_model(with_mirror(live), X[test], y[test], labels, "Signer-Dependent")
 
     si_paths = [m / "lstm" / "signer_independent" / "best.keras" for m in members]
     si_test = splits / "signer_independent_test_idx.npy"
     if all(p.exists() for p in si_paths) and si_test.exists():
         si = combine([keras.models.load_model(str(p), compile=False) for p in si_paths])
         idx = np.load(si_test)
-        results["signer_independent"] = evaluate_model(si, X[idx], y[idx], labels, "Signer-Independent")
+        results["signer_independent"] = evaluate_model(with_mirror(si), X[idx], y[idx], labels, "Signer-Independent")
         singles = [json.loads((m / "all_results.json").read_text(encoding="utf-8"))[0]
                    .get("signer_independent", {}).get("accuracy") for m in members]
         results["signer_independent"]["single_models"] = singles
         print("  One model at a time:", ", ".join(f"{a:.1%}" for a in singles if a is not None))
 
-    results["latency_ms"] = measure_latency(live, X[test][:1])
+    results["latency_ms"] = measure_latency(with_mirror(live), X[test][:1])
     print(f"  Latency: {results['latency_ms']:.2f} ms per sign")
     (out / "all_results.json").write_text(json.dumps([results], indent=2, ensure_ascii=False),
                                           encoding="utf-8")

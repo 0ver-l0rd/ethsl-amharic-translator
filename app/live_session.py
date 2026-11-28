@@ -10,7 +10,7 @@ app (app/realtime_app.py) and the web page (app/web_app.py):
     threshold it says "Not sure" instead of guessing, and names its three
     best guesses ("Not sure - maybe እንዴት, የት or ምን?"): the right word is among
     them for 93% of a new person's signs (the engine's threshold by
-    default: 0.65 for one model, 0.43 for an ensemble)
+    default: 0.65 for one model, 0.445 for an ensemble)
   - words signed one after another can make a phrase (src/phrases.py):
     እንዴት + አንተ -> "እንዴት ነህ?". Only the phrase is said: a word that could
     start one is shown at once but said only if no sign follows within

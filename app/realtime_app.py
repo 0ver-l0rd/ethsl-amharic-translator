@@ -118,7 +118,7 @@ def main():
     parser.add_argument("--camera",    type=int, default=0, help="Camera device index")
     parser.add_argument("--threshold", type=float, default=None,
                         help="Confidence threshold for accepting a prediction "
-                             "(default: 0.65 for one model, 0.43 for an ensemble)")
+                             "(default: 0.65 for one model, 0.445 for an ensemble)")
     parser.add_argument("--no_speech", action="store_true", help="Disable TTS output")
     parser.add_argument("--lite", action="store_true",
                         help="Use MediaPipe's lite pose model (faster, slightly less accurate). "
